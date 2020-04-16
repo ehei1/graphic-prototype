@@ -40,7 +40,11 @@ LPDIRECT3DINDEXBUFFER9  g_pIB = NULL;
 LPDIRECT3DTEXTURE9      g_pBackgroundTexture = NULL; // Our texture
 LPDIRECT3DTEXTURE9		g_pMainScreenTexture = NULL;
 std::unique_ptr<CFreeformLight> g_pFreemformLight{ new CFreeformLight };
-const D3DDISPLAYMODE gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
+const D3DDISPLAYMODE	gDisplayMode{ 1068, 800, 0, D3DFMT_A8R8G8B8 };
+ImVec4					gShadowColor;
+ImVec4					gLightColor;
+float					gIntensity{};
+float					gFallOff{};
 
 // A structure for our custom vertex type. We added texture coordinates
 struct CUSTOM_VERTEX
@@ -53,6 +57,21 @@ struct CUSTOM_VERTEX
 #define D3DFVF_CUSTOM (D3DFVF_XYZ|D3DFVF_TEX1)
 
 //#define DEBUG_SAMPLE
+
+D3DXCOLOR ImVec4ToD3DXCOLOR( const ImVec4& src )
+{
+	auto x = static_cast<int>( src.x );
+	auto y = static_cast<int>( src.y );
+	auto z = static_cast<int>( src.z );
+	auto w = static_cast<int>( src.w );
+
+	return D3DCOLOR_RGBA( x * 256, y * 256, z * 256, w * 256 );
+}
+
+ImVec4 D3DXCOLORToImVec4( const D3DXCOLOR& src )
+{
+	return{ src.r, src.g, src.b, src.a };
+}
 
 //-----------------------------------------------------------------------------
 // Name: InitD3D()
@@ -417,7 +436,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
     // Initialize Direct3D
     if( SUCCEEDED( InitD3D( hWnd ) ) )
     {	
-		if ( FAILED( D3DXCreateTextureFromFile( g_pd3dDevice, L"resource\\undertale_03.png", &g_pBackgroundTexture ) ) ) {
+		if ( FAILED( D3DXCreateTextureFromFile( g_pd3dDevice, L"resource\\maplestory-002.jpg", &g_pBackgroundTexture ) ) ) {
 			return E_FAIL; 
 		}
 
@@ -440,10 +459,14 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 			ImGui_ImplWin32_Init( hWnd );
 			ImGui_ImplDX9_Init( g_pd3dDevice );
 
-			// 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-			bool show_demo_window = true;
-			bool show_another_window = false;
-			ImVec4 clear_color = ImVec4( 0.45f, 0.55f, 0.60f, 1.00f );
+			// Init value
+			{
+				auto& setting = g_pFreemformLight->GetSetting();
+				gIntensity = setting.intensity;
+				gFallOff = setting.fallOff;
+				gShadowColor = D3DXCOLORToImVec4( setting.shadowColor );
+				gLightColor = D3DXCOLORToImVec4( setting.lightColor );
+			}
 
             // Enter the message loop
             MSG msg;
@@ -462,41 +485,31 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				ImGui_ImplWin32_NewFrame();
 				ImGui::NewFrame();
 
-				if ( show_demo_window )
-					ImGui::ShowDemoWindow( &show_demo_window );
-
-				// 2. Show a simple window that we create ourselves. We use a Begin/End pair to created a named window.
+				// Create ImGui widget
 				{
-					static float f = 0.0f;
-					static int counter = 0;
-
-					ImGui::Begin( "Hello, world!" );                          // Create a window called "Hello, world!" and append into it.
-
-					ImGui::Text( "This is some useful text." );               // Display some text (you can use a format strings too)
-					ImGui::Checkbox( "Demo Window", &show_demo_window );      // Edit bools storing our window open/close state
-					ImGui::Checkbox( "Another Window", &show_another_window );
-
-					ImGui::SliderFloat( "float", &f, 0.0f, 1.0f );            // Edit 1 float using a slider from 0.0f to 1.0f
-					ImGui::ColorEdit3( "clear color", (float*)&clear_color ); // Edit 3 floats representing a color
-
-					if ( ImGui::Button( "Button" ) )                            // Buttons return true when clicked (most widgets return true when edited/activated)
-						counter++;
-					ImGui::SameLine();
-					ImGui::Text( "counter = %d", counter );
-
-					ImGui::Text( "Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate );
+					ImGui::Begin( "Freeform Light" );
+					ImGui::ColorEdit4( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
+					ImGui::ColorEdit4( "Light", reinterpret_cast<float*>( &gLightColor ) );
+					ImGui::SliderFloat( "Intensity", &gIntensity, 0.f, 1.f );
+					ImGui::SliderFloat( "Fall off", &gFallOff, 0.f, 1.f );
 					ImGui::End();
+
+					CFreeformLight::Setting setting;
+					setting.fallOff = gFallOff;
+					setting.intensity = gFallOff;
+					setting.lightColor = ImVec4ToD3DXCOLOR( gLightColor );
+					setting.shadowColor = ImVec4ToD3DXCOLOR( gShadowColor );
+					g_pFreemformLight->SetSetting( setting );
 				}
 
-				// 3. Show another simple window.
-				if ( show_another_window )
-				{
-					ImGui::Begin( "Another Window", &show_another_window );   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-					ImGui::Text( "Hello from another window!" );
-					if ( ImGui::Button( "Close Me" ) )
-						show_another_window = false;
-					ImGui::End();
-				}
+				// shadow color
+				// light color
+				// fall off
+				// intensity
+				// blend op
+				//pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_SUBTRACT );
+				//pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_INVSRCALPHA );			
+				//pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ONE );
 
 				// Rendering
 				ImGui::EndFrame();

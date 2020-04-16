@@ -14,6 +14,16 @@ public:
 	void InvalidateDeviceObjects();
 	inline void Uninitialize() { InvalidateDeviceObjects(); }
 
+	struct Setting
+	{
+		D3DXCOLOR lightColor = D3DCOLOR_ARGB( 255, 255, 255, 255 );
+		D3DXCOLOR shadowColor = D3DCOLOR_ARGB( 255, 0, 0, 0 );
+		float intensity = 1.f;
+		float fallOff = 0.5f;
+	};
+	inline const Setting& GetSetting() const { return m_setting; }
+	void SetSetting( const Setting& );
+
 private:
 	// 프리폼 조명을 위한 텍스처를 만든다
 	// TODO: 텍스처를 만든 후 렌더러가 동작을 멈춘다. DX9 디버그 기능을 켜서 확인해보기. 
@@ -25,9 +35,6 @@ private:
 
 	HRESULT CreateMaskMesh( LPDIRECT3DDEVICE9, LPD3DXMESH* ) const;
 	HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* ) const;
-	HRESULT DrawHelper( LPDIRECT3DDEVICE9 ) const;
-	HRESULT DrawMask( LPDIRECT3DDEVICE9 ) const;
-	HRESULT DrawLightMask( LPDIRECT3DDEVICE9 )const;
 
 private:
 	struct CUSTOMVERTEX_MASK {
@@ -69,7 +76,5 @@ private:
 	D3DDISPLAYMODE m_displayMode = {};
 	D3DXCOLOR m_maskColor = D3DCOLOR_ARGB( 255, 255, 0, 0 );
 
-	// 도우미로 표시되는 정점
-	using HelperVertices = std::vector<D3DXVECTOR3>;
-	HelperVertices m_helperVectics;
+	Setting m_setting = {};
 };

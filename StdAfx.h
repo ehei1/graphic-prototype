@@ -6,6 +6,7 @@
 
 #include <assert.h>
 #include <d3dx9.h>
+#define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>
 #include <mmsystem.h>
 #include <tchar.h>

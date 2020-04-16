@@ -104,17 +104,16 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 	std::for_each( std::next( vertices.begin() ), vertices.end(), updateVertex );
 
 #ifdef DEBUG_FREEFORM
-		auto debugPosition = []( const CUSTOMVERTEX_LIGHT& vertex ) { 
-			auto& position = vertex.position; 
-			TCHAR debugText[MAX_PATH] = {};
-			_stprintf_s( debugText, _countof( debugText ), L"%f,%f,%f\n", position.x, position.y, position.z );
-			OutputDebugString( debugText );
-		};
-		std::for_each( vertices.begin(), vertices.end(), debugPosition );
+	auto debugPosition = []( const CUSTOMVERTEX_LIGHT& vertex ) { 
+		auto& position = vertex.position; 
+		TCHAR debugText[MAX_PATH] = {};
+		_stprintf_s( debugText, _countof( debugText ), L"%f,%f,%f\n", position.x, position.y, position.z );
+		OutputDebugString( debugText );
+	};
+	std::for_each( vertices.begin(), vertices.end(), debugPosition );
 #endif
-	//}
 
-	auto verticesSize = sizeof( Vertices::value_type ) * vertices.size();
+	auto verticesSize = static_cast<UINT>( sizeof( Vertices::value_type ) * vertices.size() );
 
 	// 버텍스 버퍼 갱신
 	{
@@ -143,7 +142,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 	Indices indices( points.size(), 1 );
 	// 마지막 위치를 제외하고는 차례대로 번호를 채운다
 	std::generate( indices.begin(), std::prev( indices.end() ), increaseNumber );
-	auto indicesSize = sizeof( Indices::value_type ) * indices.size();
+	auto indicesSize = static_cast<UINT>( sizeof( Indices::value_type ) * indices.size() );
 
 	// 인덱스 버퍼 갱신
 	{
@@ -163,14 +162,8 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 		m_pLightIndexBuffer->Unlock();
 	}
 
-	m_lightVertexCount = points.size();
-	m_lightPrimitiveCount = indices.size() - 2;
-
-	// 도우미 정점 정보 저장
-	{
-		m_helperVectics.clear();
-		m_helperVectics.insert( m_helperVectics.end(), std::next( points.cbegin() ), points.cend() );
-	}
+	m_lightVertexCount = static_cast<UINT>( points.size() );
+	m_lightPrimitiveCount = static_cast<UINT>( indices.size() - 2 );
 
 	return S_OK;
 }
@@ -519,23 +512,12 @@ HRESULT CFreeformLight::CreateMaskMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* p
 	return S_OK;
 }
 
-HRESULT CFreeformLight::DrawHelper( LPDIRECT3DDEVICE9 pDevice ) const
+void CFreeformLight::SetSetting( const Setting& setting )
 {
-	// 도우미 그리기
-	//if ( SUCCEEDED( pDevice->BeginScene() ) )
-	{
-		ID3DXLine* pLine = {};
-		D3DXCreateLine( pDevice, &pLine );
+	static_assert( sizeof( setting ) == sizeof( m_setting ), "invalid size" );
 
-		pLine->SetWidth( 2 );
-		//pLine->SetPattern( TRUE );
-		pLine->SetAntialias( TRUE );
-		pLine->Begin();
-		auto result = pLine->DrawTransform( &( *m_helperVectics.cbegin() ), m_helperVectics.size(), NULL, D3DCOLOR_XRGB( 255, 255, 255 ) );
-		pLine->End();
-
-		pDevice->EndScene();
+	if ( memcmp( &setting, &m_setting, sizeof( setting ) ) ) {
+		// mask create
+		// uv update
 	}
-
-	return S_OK;
 }
