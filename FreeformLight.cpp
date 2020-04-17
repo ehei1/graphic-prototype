@@ -83,28 +83,25 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 	// 닫는다
 	points.push_back( leftTopPoint );
 
-	struct CUSTOMVERTEX_LIGHT {
-		D3DXVECTOR3 position;
-		D3DXVECTOR2 uv;
-	};
-	using Vertices = std::vector< CUSTOMVERTEX_LIGHT >;
-	Vertices vertices( points.size(), { centerPoint,{ 1.5f, 1.5f } } );
+	auto intensity = m_setting.intensity;
+	
+	using Vertices = std::vector< CUSTOM_VERTEX >;
+	Vertices vertices( points.size(), { centerPoint,{ 1, 1 } } );
 	assert( vertices.size() == points.size() );
 
 	// 프리폼 조명의 위치를 화면 중앙에 놓는다
-	//{
-	auto updateVertex = [it = next( points.cbegin() ), i = -1, x, y, scaledDownWidth, scaledDownHeight]( CUSTOMVERTEX_LIGHT& vertex ) mutable {
+	auto updateVertex = [it = next( points.cbegin() ), i = -1, x, y, scaledDownWidth, scaledDownHeight, intensity]( CUSTOM_VERTEX& vertex ) mutable {
 		auto position = *it++;
 		auto newPosition = D3DXVECTOR3{ position.x * scaledDownWidth, position.y * scaledDownHeight, 0 };
 		newPosition += D3DXVECTOR3{ x, y, 0 };
 
 		vertex.position = newPosition;
-		vertex.uv = ( ++i % 2 ? D3DXVECTOR2{ 1.5f, 0.0f } : D3DXVECTOR2{ 0.0f, 0.0f } );
+		vertex.uv = ( ++i % 2 ? D3DXVECTOR2{ 1, intensity } : D3DXVECTOR2{ 0.0f, intensity } );
 	};
 	std::for_each( std::next( vertices.begin() ), vertices.end(), updateVertex );
 
 #ifdef DEBUG_FREEFORM
-	auto debugPosition = []( const CUSTOMVERTEX_LIGHT& vertex ) { 
+	auto debugPosition = []( const CUSTOM_VERTEX& vertex ) { 
 		auto& position = vertex.position; 
 		TCHAR debugText[MAX_PATH] = {};
 		_stprintf_s( debugText, _countof( debugText ), L"%f,%f,%f\n", position.x, position.y, position.z );
@@ -194,10 +191,12 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 	IDirect3DSurface9* pScreenSurface = {};
 	m_pScreenTexture->GetSurfaceLevel( 0, &pScreenSurface );
 
+	auto& shadowColor = m_setting.shadowColor;
+
 	LPDIRECT3DSURFACE9 curRT = {};
 	pDevice->GetRenderTarget( 0, &curRT );
 	pDevice->SetRenderTarget( 0, pScreenSurface );
-	pDevice->Clear( 0, 0, D3DCLEAR_TARGET, m_maskColor, 0.0f, 0 );
+	pDevice->Clear( 0, 0, D3DCLEAR_TARGET, shadowColor, 0.0f, 0 );
 
 	// 마스크에 조명을 그린다
 	if ( SUCCEEDED( pDevice->BeginScene() ) )
@@ -252,6 +251,14 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 		pDevice->GetRenderState( D3DRS_BLENDOP, &curBlendOp );
 		pDevice->GetRenderState( D3DRS_SRCBLEND, &curSrcBlend );
 		pDevice->GetRenderState( D3DRS_DESTBLEND, &curDestBlend );
+		DWORD curBlendOpAlpha = {};
+		DWORD curSrcBlendAlpha = {};
+		DWORD curDestBlendAlpha = {};
+		pDevice->GetRenderState( D3DRS_BLENDOPALPHA, &curBlendOpAlpha );
+		pDevice->GetRenderState( D3DRS_DESTBLENDALPHA, &curDestBlendAlpha );
+		pDevice->GetRenderState( D3DRS_SRCBLENDALPHA, &curSrcBlendAlpha );
+		DWORD curColorWriteEnable = {};
+		pDevice->GetRenderState( D3DRS_COLORWRITEENABLE, &curColorWriteEnable );
 
 		DWORD curFVF = {};
 		pDevice->GetFVF( &curFVF );
@@ -290,7 +297,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 			// result = src * 0 + dest * ( 1 - srcAlpha )
 			pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
 			pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
-			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ZERO );
+			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
 
 			m_pScreenMesh->DrawSubset( 0 );
 
@@ -303,6 +310,10 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 		pDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
 		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
+		pDevice->SetRenderState( D3DRS_BLENDOPALPHA, curBlendOpAlpha );
+		pDevice->SetRenderState( D3DRS_DESTBLENDALPHA, curDestBlendAlpha );
+		pDevice->SetRenderState( D3DRS_SRCBLENDALPHA, curSrcBlendAlpha );
+		pDevice->SetRenderState( D3DRS_COLORWRITEENABLE, curColorWriteEnable );
 	}
 
 	return S_OK;
@@ -479,7 +490,7 @@ HRESULT CFreeformLight::CreateMaskMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* p
 		auto w = static_cast<float>( m_displayMode.Width );
 		auto h = static_cast<float>( m_displayMode.Height );
 
-		const CUSTOMVERTEX_MASK vertices[] = {
+		const CUSTOM_VERTEX vertices[] = {
 			{ { -w, -h, 0 }, { 0, 0 } },//0
 			{ { -w, +h, 0 }, { 0, 1 } },//1
 			{ { +w, +h, 0 }, { 1, 1 } },//2
@@ -512,12 +523,21 @@ HRESULT CFreeformLight::CreateMaskMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* p
 	return S_OK;
 }
 
-void CFreeformLight::SetSetting( const Setting& setting )
+HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& setting )
 {
 	static_assert( sizeof( setting ) == sizeof( m_setting ), "invalid size" );
 
 	if ( memcmp( &setting, &m_setting, sizeof( setting ) ) ) {
-		// mask create
-		// uv update
+		m_setting = setting;
+
+		if ( IsVisible() ) {
+			RemoveLight();
+
+			auto x = m_displayMode.Width / 2.f;
+			auto y = m_displayMode.Height / 2.f;
+			AddLight( pDevice, x, y );
+		}
 	}
+
+	return S_OK;
 }

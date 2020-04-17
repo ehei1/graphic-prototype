@@ -13,16 +13,17 @@ public:
 	HRESULT RestoreDevice( LPDIRECT3DDEVICE9, const D3DDISPLAYMODE& );
 	void InvalidateDeviceObjects();
 	inline void Uninitialize() { InvalidateDeviceObjects(); }
+	inline bool IsVisible() const { return !!m_pLightVertexBuffer;  }
 
 	struct Setting
 	{
 		D3DXCOLOR lightColor = D3DCOLOR_ARGB( 255, 255, 255, 255 );
 		D3DXCOLOR shadowColor = D3DCOLOR_ARGB( 255, 0, 0, 0 );
-		float intensity = 1.f;
+		float intensity = 0.f;
 		float fallOff = 0.5f;
 	};
 	inline const Setting& GetSetting() const { return m_setting; }
-	void SetSetting( const Setting& );
+	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
 
 private:
 	// 프리폼 조명을 위한 텍스처를 만든다
@@ -37,7 +38,7 @@ private:
 	HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* ) const;
 
 private:
-	struct CUSTOMVERTEX_MASK {
+	struct CUSTOM_VERTEX {
 		D3DXVECTOR3 position;
 		D3DXVECTOR2 uv;
 	};

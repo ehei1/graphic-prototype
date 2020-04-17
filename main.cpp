@@ -60,12 +60,7 @@ struct CUSTOM_VERTEX
 
 D3DXCOLOR ImVec4ToD3DXCOLOR( const ImVec4& src )
 {
-	auto x = static_cast<int>( src.x );
-	auto y = static_cast<int>( src.y );
-	auto z = static_cast<int>( src.z );
-	auto w = static_cast<int>( src.w );
-
-	return D3DCOLOR_RGBA( x * 256, y * 256, z * 256, w * 256 );
+	return{ src.x, src.y, src.z, src.w };
 }
 
 ImVec4 D3DXCOLORToImVec4( const D3DXCOLOR& src )
@@ -488,18 +483,35 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				// Create ImGui widget
 				{
 					ImGui::Begin( "Freeform Light" );
-					ImGui::ColorEdit4( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
-					ImGui::ColorEdit4( "Light", reinterpret_cast<float*>( &gLightColor ) );
-					ImGui::SliderFloat( "Intensity", &gIntensity, 0.f, 1.f );
-					ImGui::SliderFloat( "Fall off", &gFallOff, 0.f, 1.f );
-					ImGui::End();
 
-					CFreeformLight::Setting setting;
-					setting.fallOff = gFallOff;
-					setting.intensity = gFallOff;
-					setting.lightColor = ImVec4ToD3DXCOLOR( gLightColor );
-					setting.shadowColor = ImVec4ToD3DXCOLOR( gShadowColor );
-					g_pFreemformLight->SetSetting( setting );
+					auto freeformLightVisible = g_pFreemformLight->IsVisible();
+					
+					if ( ImGui::Button( freeformLightVisible ? "Remove" : "Add" ) ) {
+						if ( freeformLightVisible ) {
+							g_pFreemformLight->RemoveLight();
+						}
+						else {
+							auto x = gDisplayMode.Width / 2.f;
+							auto y = gDisplayMode.Height / 2.f;
+							g_pFreemformLight->AddLight( g_pd3dDevice, x, y );
+						}
+					}
+
+					if ( freeformLightVisible ) {
+						ImGui::ColorEdit4( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
+						ImGui::ColorEdit4( "Light", reinterpret_cast<float*>( &gLightColor ) );
+						ImGui::SliderFloat( "Intensity", &gIntensity, 0.f, 1.f );
+						ImGui::SliderFloat( "Fall off", &gFallOff, 0.f, 1.f );
+
+						CFreeformLight::Setting setting;
+						setting.fallOff = gFallOff;
+						setting.intensity = gIntensity;
+						setting.lightColor = ImVec4ToD3DXCOLOR( gLightColor );
+						setting.shadowColor = ImVec4ToD3DXCOLOR( gShadowColor );
+						g_pFreemformLight->SetSetting( g_pd3dDevice, setting );
+					}
+
+					ImGui::End();
 				}
 
 				// shadow color
