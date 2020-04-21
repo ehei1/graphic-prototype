@@ -498,10 +498,10 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 					}
 
 					if ( freeformLightVisible ) {
-						ImGui::ColorEdit4( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
-						ImGui::ColorEdit4( "Light", reinterpret_cast<float*>( &gLightColor ) );
+						ImGui::ColorEdit3( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
+						ImGui::ColorEdit3( "Light", reinterpret_cast<float*>( &gLightColor ) );
 						ImGui::SliderFloat( "Intensity", &gIntensity, 0.f, 1.f );
-						ImGui::SliderFloat( "Fall off", &gFallOff, 0.f, 1.f );
+						//ImGui::SliderFloat( "Fall off", &gFallOff, 0.f, 1.f );
 
 						CFreeformLight::Setting setting;
 						setting.fallOff = gFallOff;

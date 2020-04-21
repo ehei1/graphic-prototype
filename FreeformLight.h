@@ -17,8 +17,8 @@ public:
 
 	struct Setting
 	{
-		D3DXCOLOR lightColor = D3DCOLOR_ARGB( 255, 255, 255, 255 );
-		D3DXCOLOR shadowColor = D3DCOLOR_ARGB( 255, 0, 0, 0 );
+		D3DXCOLOR lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
+		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 0, 0, 0 );
 		float intensity = 0.f;
 		float fallOff = 0.5f;
 	};
@@ -32,7 +32,7 @@ private:
 	// pTexture: 생성할 텍스처를 담을 포인터
 	HRESULT CreateLightTextureByRenderer( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture ) const;
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
-	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture ) const;
+	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const D3DXCOLOR& ) const;
 
 	HRESULT CreateMaskMesh( LPDIRECT3DDEVICE9, LPD3DXMESH* ) const;
 	HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* ) const;

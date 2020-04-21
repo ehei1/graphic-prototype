@@ -47,7 +47,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 
 	// 초기화
 	if ( !m_pLightTexture ) {
-		if ( FAILED( CreateLightTextureByLockRect( pDevice, &m_pLightTexture ) ) ) {
+		if ( FAILED( CreateLightTextureByLockRect( pDevice, &m_pLightTexture, m_setting.lightColor ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -196,7 +196,9 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 	LPDIRECT3DSURFACE9 curRT = {};
 	pDevice->GetRenderTarget( 0, &curRT );
 	pDevice->SetRenderTarget( 0, pScreenSurface );
-	pDevice->Clear( 0, 0, D3DCLEAR_TARGET, shadowColor, 0.0f, 0 );
+	auto clearColor = D3DXCOLOR{ shadowColor.r, shadowColor.g, shadowColor.b, 1 };
+
+	pDevice->Clear( 0, 0, D3DCLEAR_TARGET, clearColor, 0.0f, 0 );
 
 	// 마스크에 조명을 그린다
 	if ( SUCCEEDED( pDevice->BeginScene() ) )
@@ -217,11 +219,11 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 		pDevice->SetTexture( 0, m_pLightTexture );
 		pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
 		pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
-		// 투명 값으로 구멍을 뚫는다
-		// result = src * 0 + dest * src
+		// 마스크를 덮어쓴다
+		// result = src * srcAlpha + dest * ( 1 - srcAlpha )
 		pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-		pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ZERO );
-		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_SRCCOLOR );
+		pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
+		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
 		pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, vertexBufferDesc.Size / m_lightVertexCount );
 		pDevice->SetIndices( m_pLightIndexBuffer );
 		pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, m_lightVertexCount, 0, m_lightPrimitiveCount );
@@ -259,6 +261,8 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 		pDevice->GetRenderState( D3DRS_SRCBLENDALPHA, &curSrcBlendAlpha );
 		DWORD curColorWriteEnable = {};
 		pDevice->GetRenderState( D3DRS_COLORWRITEENABLE, &curColorWriteEnable );
+		DWORD separateAlphablendable = {};
+		pDevice->GetRenderState( D3DRS_SEPARATEALPHABLENDENABLE, &separateAlphablendable );
 
 		DWORD curFVF = {};
 		pDevice->GetFVF( &curFVF );
@@ -288,16 +292,17 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 				pDevice->SetTransform( D3DTS_WORLD, &tm );
 			}
 
-			// 괴이한 효과
-			// result = dest - src * ( 1 - srcAlpha)
-			//pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_SUBTRACT );
-			//pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_INVSRCALPHA );			
-			//pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ONE );
+			//pDevice->SetTextureStageState( 0, D3DTSS_ALPHAARG1, D3DTA_TEXTURE );
+			//pDevice->SetTextureStageState( 0, D3DTSS_ALPHAOP, D3DTOP_SELECTARG1 );
+
 			// 마스크를 반전해서 게임 화면이 그려진 렌더타겟의 색깔과 곱한다
 			// result = src * 0 + dest * ( 1 - srcAlpha )
 			pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-			pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
-			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
+			pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
+			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR );
+			//pDevice->SetRenderState( D3DRS_BLENDOPALPHA, D3DBLENDOP_ADD );
+			//pDevice->SetRenderState( D3DRS_DESTBLENDALPHA, D3DBLEND_SRCALPHA );
+			//pDevice->SetRenderState( D3DRS_SRCBLENDALPHA, D3DBLEND_INVSRCALPHA );
 
 			m_pScreenMesh->DrawSubset( 0 );
 
@@ -314,12 +319,13 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCen
 		pDevice->SetRenderState( D3DRS_DESTBLENDALPHA, curDestBlendAlpha );
 		pDevice->SetRenderState( D3DRS_SRCBLENDALPHA, curSrcBlendAlpha );
 		pDevice->SetRenderState( D3DRS_COLORWRITEENABLE, curColorWriteEnable );
+		pDevice->SetRenderState( D3DRS_SEPARATEALPHABLENDENABLE, separateAlphablendable );
 	}
 
 	return S_OK;
 }
 
-HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture ) const
+HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture, const D3DXCOLOR& color ) const
 {
 	ASSERT( !*pOutTexture );
 
@@ -336,12 +342,15 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 		D3DLOCKED_RECT lockedRect = {};
 		pTexture->LockRect( 0, &lockedRect, NULL, D3DLOCK_READONLY );
 		auto* const colors = static_cast<LPDWORD>( lockedRect.pBits );
+		auto r = static_cast<int>( color.r * 255 );
+		auto g = static_cast<int>( color.g * 255 );
+		auto b = static_cast<int>( color.b * 255 );
 
 		for ( auto y = 0; y < resolution; ++y ) {
 			for ( auto x = 0; x < resolution; ++x ) {
 				auto index = y * resolution + x;
 
-				colors[index] = D3DCOLOR_ARGB( 255 - y, 255, 255, 255 );
+				colors[index] = D3DCOLOR_ARGB( y, static_cast<int>( r ), static_cast<int>( g ), static_cast<int>( b ) );
 			}
 		}
 
@@ -531,6 +540,9 @@ HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& se
 		m_setting = setting;
 
 		if ( IsVisible() ) {
+			SAFE_RELEASE( m_pLightTexture );
+			CreateLightTextureByLockRect( pDevice, &m_pLightTexture, m_setting.lightColor );
+
 			RemoveLight();
 
 			auto x = m_displayMode.Width / 2.f;
