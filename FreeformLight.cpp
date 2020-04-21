@@ -3,7 +3,7 @@
 #include <iostream>
 #include "FreeformLight.h"
 
-#define DEBUG_FREEFORM
+// #define DEBUG_FREEFORM
 
 
 // FreeformData
