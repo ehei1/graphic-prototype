@@ -1,8 +1,6 @@
-job:
-    stage:
-        - build
-    tags:
-        - windows-docker
+.build:
+    deploy:
         - windows-runner
     script:
+        - echo 'test'
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
