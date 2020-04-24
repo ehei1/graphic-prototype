@@ -7,20 +7,23 @@
 class CFreeformLight
 {
 public:
-	HRESULT AddLight( LPDIRECT3DDEVICE9, float x, float y );
+	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();
-	HRESULT Draw( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter );
+	HRESULT Draw( LPDIRECT3DDEVICE9, float x, float y );
 	HRESULT RestoreDevice( LPDIRECT3DDEVICE9, const D3DDISPLAYMODE& );
 	void InvalidateDeviceObjects();
 	inline void Uninitialize() { InvalidateDeviceObjects(); }
-	inline bool IsVisible() const { return !!m_pLightVertexBuffer;  }
+	inline bool IsVisible() const { return !!m_pLightVertexBuffer; }
 
 	struct Setting
 	{
 		D3DXCOLOR lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
 		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 0, 0, 0 );
-		float intensity = 0.f;
-		float fallOff = 0.5f;
+		float intensity = 1.f;
+		float fallOff = 0.f;
+
+		inline bool operator==( const Setting& setting ) const { return !memcmp( &setting, this, sizeof( setting ) ); }
+		inline bool operator!=( const Setting& setting ) const { return !( *this == setting ); }
 	};
 	inline const Setting& GetSetting() const { return m_setting; }
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
@@ -32,7 +35,7 @@ private:
 	// pTexture: 생성할 텍스처를 담을 포인터
 	HRESULT CreateLightTextureByRenderer( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture ) const;
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
-	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const D3DXCOLOR& ) const;
+	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
 
 	HRESULT CreateMaskMesh( LPDIRECT3DDEVICE9, LPD3DXMESH* ) const;
 	HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* ) const;
@@ -64,18 +67,18 @@ private:
 	};
 	std::vector< D3DXVECTOR3 > m_rightSideVectices{
 		{ +1.0f, +1.f, 0.f },
-		{ +1.5f,  0.f, 0.f },
+		//{ +1.5f,  0.f, 0.f },
 	};
 	std::vector< D3DXVECTOR3 > m_bottomSideVertices{
 		{ +1.f, -1.f, 0.f },
 	};
 	std::vector< D3DXVECTOR3 > m_leftSideVertices{
 		{ -1.0f, -1.f, 0.f },
-		{ -1.5f, -1.f, 0.f },
-		{ -1.0f,  0.f, 0.f },
+		//{ -1.5f, -1.f, 0.f },
+		//{ -1.0f,  0.f, 0.f },
 	};
-	D3DDISPLAYMODE m_displayMode = {};
-	D3DXCOLOR m_maskColor = D3DCOLOR_ARGB( 255, 255, 0, 0 );
+	D3DDISPLAYMODE m_displayMode{};
 
-	Setting m_setting = {};
+	Setting m_setting{};
+	POINT m_position{};
 };

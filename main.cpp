@@ -40,7 +40,7 @@ LPDIRECT3DINDEXBUFFER9  g_pIB = NULL;
 LPDIRECT3DTEXTURE9      g_pBackgroundTexture = NULL; // Our texture
 LPDIRECT3DTEXTURE9		g_pMainScreenTexture = NULL;
 std::unique_ptr<CFreeformLight> g_pFreemformLight{ new CFreeformLight };
-const D3DDISPLAYMODE	gDisplayMode{ 1068, 800, 0, D3DFMT_A8R8G8B8 };
+const D3DDISPLAYMODE	gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
 ImVec4					gShadowColor;
 ImVec4					gLightColor;
 float					gIntensity{};
@@ -324,7 +324,7 @@ VOID Render()
 #endif
 		}
 
-		g_pFreemformLight->Draw( g_pd3dDevice, static_cast<LONG>( x ), static_cast<LONG>( y ) );
+		g_pFreemformLight->Draw( g_pd3dDevice, x, y );
 
 		SAFE_RELEASE( pMainScreenSurface );
 	}
@@ -387,8 +387,8 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 			switch ( wParam ) {
 			case 0x5a: // z
 			{
-				auto x = gDisplayMode.Width / 2.f;
-				auto y = gDisplayMode.Height / 2.f;
+				auto x = gDisplayMode.Width / 2;
+				auto y = gDisplayMode.Height / 2;
 				g_pFreemformLight->AddLight( g_pd3dDevice, x, y );
 				break;
 			}
@@ -454,6 +454,17 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 			ImGui_ImplWin32_Init( hWnd );
 			ImGui_ImplDX9_Init( g_pd3dDevice );
 
+			// https://stackoverflow.com/questions/11387564/get-a-font-filepath-from-name-and-style-in-c-windows
+			{
+				char winDir[MAX_PATH]{};
+				GetWindowsDirectoryA( winDir, _countof( winDir ) );
+
+				std::string fontName = "\\fonts\\malgun.ttf";
+				fontName.insert( fontName.cbegin(), winDir, winDir + strlen( winDir ) );
+
+				io.Fonts->AddFontFromFileTTF( fontName.c_str(), 15, nullptr, io.Fonts->GetGlyphRangesKorean() );
+			}
+
 			// Init value
 			{
 				auto& setting = g_pFreemformLight->GetSetting();
@@ -482,7 +493,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 
 				// Create ImGui widget
 				{
-					ImGui::Begin( "Freeform Light" );
+					ImGui::Begin( u8"ÇÁ¸®Æû" );
 
 					auto freeformLightVisible = g_pFreemformLight->IsVisible();
 					
@@ -491,8 +502,8 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 							g_pFreemformLight->RemoveLight();
 						}
 						else {
-							auto x = gDisplayMode.Width / 2.f;
-							auto y = gDisplayMode.Height / 2.f;
+							auto x = gDisplayMode.Width / 2;
+							auto y = gDisplayMode.Height / 2;
 							g_pFreemformLight->AddLight( g_pd3dDevice, x, y );
 						}
 					}
@@ -501,7 +512,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 						ImGui::ColorEdit3( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
 						ImGui::ColorEdit3( "Light", reinterpret_cast<float*>( &gLightColor ) );
 						ImGui::SliderFloat( "Intensity", &gIntensity, 0.f, 1.f );
-						//ImGui::SliderFloat( "Fall off", &gFallOff, 0.f, 1.f );
+						ImGui::SliderFloat( "Falloff", &gFallOff, -0.5f, 0.5f );
 
 						CFreeformLight::Setting setting;
 						setting.fallOff = gFallOff;
