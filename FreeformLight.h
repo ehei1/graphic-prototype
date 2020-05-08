@@ -17,7 +17,7 @@ public:
 	// x: 조명을 그릴 위치
 	// y: 조명을 그릴 위치
 	HRESULT Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSurface, float x, float y );
-	HRESULT RestoreDevice( LPDIRECT3DDEVICE9, const D3DDISPLAYMODE& );
+	HRESULT RestoreDevice( const D3DDISPLAYMODE& );
 	void InvalidateDeviceObjects();
 	inline void Uninitialize() { InvalidateDeviceObjects(); }
 	inline bool IsVisible() const { return !!m_pLightVertexBuffer; }
@@ -86,4 +86,6 @@ private:
 
 	Setting m_setting{};
 	POINT m_position{};
+
+	const int m_lightVertexFvf = D3DFVF_XYZ | D3DFVF_TEX1;
 };

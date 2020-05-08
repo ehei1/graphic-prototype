@@ -1,6 +1,7 @@
 #include "StdAfx.h"
 #include <algorithm>
 #include <iostream>
+#include <string>
 #include "FreeformLight.h"
 
 #define DEBUG_FREEFORM
@@ -13,7 +14,7 @@ void CFreeformLight::InvalidateDeviceObjects()
 	SAFE_RELEASE( m_pLightVertexBuffer );
 }
 
-HRESULT CFreeformLight::RestoreDevice( LPDIRECT3DDEVICE9 pDevice, const D3DDISPLAYMODE& displayMode )
+HRESULT CFreeformLight::RestoreDevice( const D3DDISPLAYMODE& displayMode )
 {
 	m_displayMode = displayMode;
 	return S_OK;
@@ -92,9 +93,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 	// 버텍스 버퍼 갱신
 	{
-		constexpr auto fvf = D3DFVF_XYZ | D3DFVF_TEX1;
-
-		if ( FAILED( pDevice->CreateVertexBuffer( verticesSize, 0, fvf, D3DPOOL_DEFAULT, &m_pLightVertexBuffer, NULL ) ) ) {
+		if ( FAILED( pDevice->CreateVertexBuffer( verticesSize, 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &m_pLightVertexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -182,8 +181,6 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 
 		pDevice->SetTransform( D3DTS_VIEW, &view );
 	}
-
-	auto& shadowColor = m_setting.shadowColor;
 
 	// 마스크에 조명을 그린다
 	if ( SUCCEEDED( pDevice->BeginScene() ) )
@@ -490,8 +487,6 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 				RemoveLight();
 			}
 			else {
-				auto x = m_displayMode.Width / 2;
-				auto y = m_displayMode.Height / 2;
 				AddLight( pDevice, xCenter, yCenter );
 			}
 		}
@@ -509,5 +504,78 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 		}
 
 		ImGui::End();
+
+		if ( freeformLightVisible ) {			
+			using Words = std::vector<WORD>;
+
+			// 인덱스 추출
+			auto getUniqueIndices = [pBuffer = m_pLightIndexBuffer]() {
+				D3DINDEXBUFFER_DESC desc{};
+				pBuffer->GetDesc( &desc );
+				ASSERT( desc.Format == D3DFMT_INDEX16 );
+				ASSERT( sizeof( WORD ) == 2 );
+
+				LPVOID pData{};
+				pBuffer->Lock( 0, desc.Size, &pData, 0 );
+
+				auto count = desc.Size / sizeof( Words::value_type );
+				Words words( count );
+				memcpy( words.data(), pData, desc.Size );
+
+				pBuffer->Unlock();
+
+				return words;
+			};
+			auto indices = getUniqueIndices();
+			// 최초는 중심점인데 필요 없어 제외
+			indices.erase( std::cbegin( indices ) );
+			// 마지막 것도 필요 없어 제외
+			indices.pop_back();
+
+			using Vertices = std::vector<CUSTOM_VERTEX>;
+
+			// 버텍스 추출
+			auto getVertices = [pBuffer = m_pLightVertexBuffer, fvf = m_lightVertexFvf]() {
+				D3DVERTEXBUFFER_DESC desc{};
+				pBuffer->GetDesc( &desc );
+				ASSERT( desc.FVF == fvf );
+
+				LPVOID pData{};
+				pBuffer->Lock( 0, desc.Size, &pData, 0 );
+
+				auto count = desc.Size / sizeof( Vertices::value_type );
+				Vertices vertices( count );
+				memcpy( vertices.data(), pData, desc.Size );
+
+				pBuffer->Unlock();
+
+				return vertices;
+			};
+			auto vertices = getVertices();
+
+#ifdef _DEBUG
+			{
+				auto minmax = std::minmax_element( std::cbegin( indices ), std::cend( indices ) );
+				ASSERT( *minmax.first > -1 && *minmax.second < vertices.size() );
+			}
+#endif
+
+			// 이동 가능한 단추를 그린다. 사실은 부유 창
+			for ( auto i = 0; i < indices.size(); ++i ) {
+				auto index = indices[i];
+				auto& vertex = vertices[index];
+				auto name = std::to_string( i + 1 );
+				
+				ImGui::SetNextWindowPos( { vertex.position.x, vertex.position.y }, ImGuiCond_Once );
+				ImGui::Begin( name.c_str(), 0, ImGuiWindowFlags_NoDecoration );
+				ImGui::LabelText( ".", name.c_str() );
+				ImGui::End();
+			}
+
+			// 선을 그린다
+
+			// 처음 시작된 점과 만나기 위해 끝에 넣는다. 끝에는 중심 버텍스 정보가 있다
+			indices.emplace_back( indices.front() );
+		}
 	}
 }

@@ -108,7 +108,7 @@ HRESULT InitD3D( HWND hWnd )
 	g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_DESTALPHA );    // set dest factor
 	g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );    // set the operation
 
-	g_pFreemformLight->RestoreDevice( g_pd3dDevice, gDisplayMode );
+	g_pFreemformLight->RestoreDevice( gDisplayMode );
 
 	if ( FAILED( g_pd3dDevice->CreateTexture( gDisplayMode.Width, gDisplayMode.Height, 1, D3DUSAGE_RENDERTARGET, gDisplayMode.Format, D3DPOOL_DEFAULT, &g_pMainScreenTexture, NULL ) ) ) {
 		return E_FAIL;
@@ -528,6 +528,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				ImGui_ImplDX9_NewFrame();
 				ImGui_ImplWin32_NewFrame();
 				ImGui::NewFrame();
+
 				ImGui::SetNextWindowPos( { gDisplayMode.Width / 2.f, gDisplayMode.Height / 2.f }, ImGuiCond_Once );
 
 				// Create ImGui widget
