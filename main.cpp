@@ -39,12 +39,10 @@ LPDIRECT3DVERTEXBUFFER9 g_pVB = NULL; // Buffer to hold vertices
 LPDIRECT3DINDEXBUFFER9  g_pIB = NULL;
 LPDIRECT3DTEXTURE9      g_pBackgroundTexture = NULL; // Our texture
 LPDIRECT3DTEXTURE9		g_pMainScreenTexture = NULL;
+LPD3DXMESH				g_pScreenMesh = NULL;
+LPDIRECT3DTEXTURE9		g_pScreenTexture = NULL;
 std::unique_ptr<CFreeformLight> g_pFreemformLight{ new CFreeformLight };
 const D3DDISPLAYMODE	gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
-ImVec4					gShadowColor;
-ImVec4					gLightColor;
-float					gIntensity{};
-float					gFallOff{};
 
 // A structure for our custom vertex type. We added texture coordinates
 struct CUSTOM_VERTEX
@@ -175,6 +173,9 @@ HRESULT InitGeometry()
 		}
 	}
 
+	g_pFreemformLight->CreateMaskMesh( g_pd3dDevice, &g_pScreenMesh, gDisplayMode.Width, gDisplayMode.Height );
+	g_pFreemformLight->CreateMaskTexture( g_pd3dDevice, &g_pScreenTexture, gDisplayMode.Width, gDisplayMode.Height );
+
     return S_OK;
 }
 
@@ -187,6 +188,9 @@ HRESULT InitGeometry()
 //-----------------------------------------------------------------------------
 VOID Cleanup()
 {
+	SAFE_RELEASE( g_pScreenTexture );
+	SAFE_RELEASE( g_pScreenMesh );
+
     if( g_pBackgroundTexture != NULL )
         g_pBackgroundTexture->Release();
 
@@ -324,7 +328,21 @@ VOID Render()
 #endif
 		}
 
-		g_pFreemformLight->Draw( g_pd3dDevice, x, y );
+		// 프리폼 조명
+		if ( g_pFreemformLight->IsVisible() ) 
+		{
+			LPDIRECT3DSURFACE9 pScreenSurface{};
+			g_pScreenTexture->GetSurfaceLevel( 0, &pScreenSurface );
+
+			auto clearColor = g_pFreemformLight->GetSetting().shadowColor;
+
+			LPDIRECT3DSURFACE9 curRT = {};
+			g_pd3dDevice->GetRenderTarget( 0, &curRT );
+			g_pd3dDevice->SetRenderTarget( 0, pScreenSurface );
+			g_pd3dDevice->Clear( 0, 0, D3DCLEAR_TARGET, clearColor, 0.0f, 0 );
+
+			g_pFreemformLight->Draw( g_pd3dDevice, pScreenSurface, x, y );
+		}
 
 		SAFE_RELEASE( pMainScreenSurface );
 	}
@@ -344,18 +362,45 @@ VOID Render()
 		g_pd3dDevice->GetRenderState( D3DRS_SRCBLEND, &curSrcBlend );
 		g_pd3dDevice->GetRenderState( D3DRS_DESTBLEND, &curDestBlend );
 
-		g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-		g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ONE );
-		g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
-
 		DWORD currentFVF = {};
 		g_pd3dDevice->GetFVF( &currentFVF );
 
-		g_pd3dDevice->SetTexture( 0, g_pMainScreenTexture );
-		g_pd3dDevice->SetStreamSource( 0, g_pVB, 0, sizeof( CUSTOM_VERTEX ) );
-		g_pd3dDevice->SetIndices( g_pIB );
-		g_pd3dDevice->SetFVF( D3DFVF_CUSTOM );
-		g_pd3dDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, 4, 0, 2 );
+		{
+			g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
+			g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ONE );
+			g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
+
+			g_pd3dDevice->SetTexture( 0, g_pMainScreenTexture );
+			g_pd3dDevice->SetStreamSource( 0, g_pVB, 0, sizeof( CUSTOM_VERTEX ) );
+			g_pd3dDevice->SetIndices( g_pIB );
+			g_pd3dDevice->SetFVF( D3DFVF_CUSTOM );
+			g_pd3dDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, 4, 0, 2 );
+		}
+
+		// 마스크 그리기
+		if ( g_pFreemformLight->IsVisible() )
+		{
+			D3DXMATRIX curWm = {};
+			g_pd3dDevice->GetTransform( D3DTS_WORLD, &curWm );
+
+			// 이동
+			D3DXMATRIX tm{};
+			D3DXMatrixTranslation( &tm, x, y, 0 );
+			g_pd3dDevice->SetTransform( D3DTS_WORLD, &tm );
+
+			if ( !g_pFreemformLight->GetSetting().maskOnly ) {
+				// 마스크를 반전해서 게임 화면이 그려진 렌더타겟의 색깔과 곱한다
+				// result = src * 0 + dest * ( 1 - srcAlpha )
+				g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
+				g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
+				g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR );
+			}
+
+			g_pd3dDevice->SetTexture( 0, g_pScreenTexture );
+			g_pScreenMesh->DrawSubset( 0 );
+
+			g_pd3dDevice->SetTransform( D3DTS_WORLD, &curWm );
+		}
 
 		g_pd3dDevice->EndScene();
 		g_pd3dDevice->SetFVF( currentFVF );
@@ -465,14 +510,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				io.Fonts->AddFontFromFileTTF( fontName.c_str(), 15, nullptr, io.Fonts->GetGlyphRangesKorean() );
 			}
 
-			// Init value
-			{
-				auto& setting = g_pFreemformLight->GetSetting();
-				gIntensity = setting.intensity;
-				gFallOff = setting.fallOff;
-				gShadowColor = D3DXCOLORToImVec4( setting.shadowColor );
-				gLightColor = D3DXCOLORToImVec4( setting.lightColor );
-			}
+			auto showWindow = true;
 
             // Enter the message loop
             MSG msg;
@@ -490,49 +528,12 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				ImGui_ImplDX9_NewFrame();
 				ImGui_ImplWin32_NewFrame();
 				ImGui::NewFrame();
+				ImGui::SetNextWindowPos( { gDisplayMode.Width / 2.f, gDisplayMode.Height / 2.f }, ImGuiCond_Once );
 
 				// Create ImGui widget
-				{
-					ImGui::Begin( u8"프리폼" );
-
-					auto freeformLightVisible = g_pFreemformLight->IsVisible();
-					
-					if ( ImGui::Button( freeformLightVisible ? "Remove" : "Add" ) ) {
-						if ( freeformLightVisible ) {
-							g_pFreemformLight->RemoveLight();
-						}
-						else {
-							auto x = gDisplayMode.Width / 2;
-							auto y = gDisplayMode.Height / 2;
-							g_pFreemformLight->AddLight( g_pd3dDevice, x, y );
-						}
-					}
-
-					if ( freeformLightVisible ) {
-						ImGui::ColorEdit3( "Shadow", reinterpret_cast<float*>( &gShadowColor ) );
-						ImGui::ColorEdit3( "Light", reinterpret_cast<float*>( &gLightColor ) );
-						ImGui::SliderFloat( "Intensity", &gIntensity, 0.f, 1.f );
-						ImGui::SliderFloat( "Falloff", &gFallOff, -0.5f, 0.5f );
-
-						CFreeformLight::Setting setting;
-						setting.fallOff = gFallOff;
-						setting.intensity = gIntensity;
-						setting.lightColor = ImVec4ToD3DXCOLOR( gLightColor );
-						setting.shadowColor = ImVec4ToD3DXCOLOR( gShadowColor );
-						g_pFreemformLight->SetSetting( g_pd3dDevice, setting );
-					}
-
-					ImGui::End();
-				}
-
-				// shadow color
-				// light color
-				// fall off
-				// intensity
-				// blend op
-				//pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_SUBTRACT );
-				//pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_INVSRCALPHA );			
-				//pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ONE );
+				auto xCenter = gDisplayMode.Width / 2;
+				auto yCenter = gDisplayMode.Height / 2;
+				g_pFreemformLight->CreateImgui( g_pd3dDevice, xCenter, yCenter, showWindow );
 
 				// Rendering
 				ImGui::EndFrame();

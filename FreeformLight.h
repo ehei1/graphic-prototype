@@ -7,26 +7,40 @@
 class CFreeformLight
 {
 public:
+	// 
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();
-	HRESULT Draw( LPDIRECT3DDEVICE9, float x, float y );
+	// 조명을 그린다
+	//
+	// pDevice: 조명을 그리는데 쓰는 장치
+	// pSurface: 조명을 그릴 표면
+	// x: 조명을 그릴 위치
+	// y: 조명을 그릴 위치
+	HRESULT Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSurface, float x, float y );
 	HRESULT RestoreDevice( LPDIRECT3DDEVICE9, const D3DDISPLAYMODE& );
 	void InvalidateDeviceObjects();
 	inline void Uninitialize() { InvalidateDeviceObjects(); }
 	inline bool IsVisible() const { return !!m_pLightVertexBuffer; }
+
+	// 개발 용도의 imgui 창을 만든다
+	void CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool& isVisible );
 
 	struct Setting
 	{
 		D3DXCOLOR lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
 		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 0, 0, 0 );
 		float intensity = 1.f;
-		float fallOff = 0.f;
+		float fallOff = 1.f;
+		bool maskOnly{};
 
 		inline bool operator==( const Setting& setting ) const { return !memcmp( &setting, this, sizeof( setting ) ); }
 		inline bool operator!=( const Setting& setting ) const { return !( *this == setting ); }
 	};
 	inline const Setting& GetSetting() const { return m_setting; }
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
+
+	static HRESULT CreateMaskMesh( LPDIRECT3DDEVICE9, LPD3DXMESH*, UINT width, UINT height );
+	static HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9*, UINT width, UINT height );
 
 private:
 	// 프리폼 조명을 위한 텍스처를 만든다
@@ -37,30 +51,21 @@ private:
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
 
-	HRESULT CreateMaskMesh( LPDIRECT3DDEVICE9, LPD3DXMESH* ) const;
-	HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* ) const;
-
 private:
 	struct CUSTOM_VERTEX {
 		D3DXVECTOR3 position;
 		D3DXVECTOR2 uv;
 	};
-	// 조명을 모아 한꺼번에 그리려는 화면만한 메시. 그 다음 게임 화면에 마스크처럼 씌워서 조명 효과를 낸다
-	LPD3DXMESH m_pScreenMesh = {};
-	// 텍스처
-	LPDIRECT3DTEXTURE9 m_pScreenTexture = {};
 
 	// 개별 프리폼 조명 정보
 	// 텍스처
-	LPDIRECT3DTEXTURE9 m_pLightTexture = {};
+	LPDIRECT3DTEXTURE9 m_pLightTexture{};
 	// 버퍼
-	LPDIRECT3DINDEXBUFFER9 m_pLightIndexBuffer = {};
-	LPDIRECT3DVERTEXBUFFER9 m_pLightVertexBuffer = {};
+	LPDIRECT3DINDEXBUFFER9 m_pLightIndexBuffer{};
+	LPDIRECT3DVERTEXBUFFER9 m_pLightVertexBuffer{};
 	// 버텍스 개수
-	UINT m_lightVertexCount = {};
-	UINT m_lightPrimitiveCount = {};
-
-	const DWORD m_fvf = D3DFVF_XYZ | D3DFVF_TEX1;
+	UINT m_lightVertexCount{};
+	UINT m_lightPrimitiveCount{};
 
 	std::vector< D3DXVECTOR3 > m_topSideVertices{
 		{ -1.f, +1.f, -0.f },

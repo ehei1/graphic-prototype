@@ -3,7 +3,7 @@
 #include <iostream>
 #include "FreeformLight.h"
 
-//#define DEBUG_FREEFORM
+#define DEBUG_FREEFORM
 
 
 void CFreeformLight::InvalidateDeviceObjects()
@@ -11,26 +11,10 @@ void CFreeformLight::InvalidateDeviceObjects()
 	SAFE_RELEASE( m_pLightTexture );
 	SAFE_RELEASE( m_pLightIndexBuffer );
 	SAFE_RELEASE( m_pLightVertexBuffer );
-	SAFE_RELEASE( m_pScreenTexture );
-	SAFE_RELEASE( m_pScreenMesh );
 }
 
 HRESULT CFreeformLight::RestoreDevice( LPDIRECT3DDEVICE9 pDevice, const D3DDISPLAYMODE& displayMode )
 {
-	if ( m_pLightVertexBuffer ) {
-		SAFE_RELEASE( m_pScreenMesh );
-
-		if ( FAILED( CreateMaskMesh( pDevice, &m_pScreenMesh ) ) ) {
-			return E_FAIL;
-		}
-
-		SAFE_RELEASE( m_pScreenTexture );
-
-		if ( FAILED( CreateMaskTexture( pDevice, &m_pScreenTexture ) ) ) {
-			return E_FAIL;
-		}
-	}
-
 	m_displayMode = displayMode;
 	return S_OK;
 }
@@ -52,16 +36,8 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
-		else if ( FAILED( CreateMaskMesh( pDevice, &m_pScreenMesh ) ) ) {
-			ASSERT( FALSE );
-			return E_FAIL;
-		}
-		else if ( FAILED( CreateMaskTexture( pDevice, &m_pScreenTexture ) ) ) {
-			ASSERT( FALSE );
-			return E_FAIL;
-		}
 
-		ASSERT( m_pLightTexture && m_pScreenTexture && m_pScreenMesh );
+		ASSERT( m_pLightTexture );
 	}
 
 	D3DXVECTOR3 centerPoint{ static_cast<float>( x ), static_cast<float>( y ),{} };
@@ -88,7 +64,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 	auto falloff = m_setting.fallOff;
 
 	using Vertices = std::vector< CUSTOM_VERTEX >;
-	Vertices vertices( points.size(), { centerPoint,{ 1, 1 } } );
+	Vertices vertices( points.size(), { centerPoint,{ falloff, falloff } } );
 	ASSERT( vertices.size() == points.size() );
 
 	// 프리폼 조명의 위치를 화면 중앙에 놓는다
@@ -98,7 +74,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 		newPosition += D3DXVECTOR3{ static_cast<float>( x ), static_cast<float>( y ), 0 };
 
 		vertex.position = newPosition;
-		vertex.uv = ( ++i % 2 ? D3DXVECTOR2{ 1, falloff } : D3DXVECTOR2{ 0, falloff } );
+		vertex.uv = ( ++i % 2 ? D3DXVECTOR2{ falloff, 0 } : D3DXVECTOR2{ 0, 0 } );
 	};
 	std::for_each( std::next( vertices.begin() ), vertices.end(), updateVertex );
 
@@ -116,7 +92,9 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 	// 버텍스 버퍼 갱신
 	{
-		if ( FAILED( pDevice->CreateVertexBuffer( verticesSize, 0, m_fvf, D3DPOOL_DEFAULT, &m_pLightVertexBuffer, NULL ) ) ) {
+		constexpr auto fvf = D3DFVF_XYZ | D3DFVF_TEX1;
+
+		if ( FAILED( pDevice->CreateVertexBuffer( verticesSize, 0, fvf, D3DPOOL_DEFAULT, &m_pLightVertexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -183,15 +161,12 @@ HRESULT CFreeformLight::RemoveLight()
 	return S_OK;
 }
 
-HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, float x, float y )
+HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSurface, float x, float y )
 {
 	if ( !m_pLightVertexBuffer )
 	{
 		return S_OK;
 	}
-
-	LPDIRECT3DSURFACE9 pScreenSurface = {};
-	m_pScreenTexture->GetSurfaceLevel( 0, &pScreenSurface );
 
 	D3DMATRIX curVm{};
 	pDevice->GetTransform( D3DTS_VIEW, &curVm );
@@ -209,13 +184,6 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 	}
 
 	auto& shadowColor = m_setting.shadowColor;
-
-	LPDIRECT3DSURFACE9 curRT = {};
-	pDevice->GetRenderTarget( 0, &curRT );
-	pDevice->SetRenderTarget( 0, pScreenSurface );
-	auto clearColor = D3DXCOLOR{ shadowColor.r, shadowColor.g, shadowColor.b, 1 };
-
-	pDevice->Clear( 0, 0, D3DCLEAR_TARGET, clearColor, 0.0f, 0 );
 
 	// 마스크에 조명을 그린다
 	if ( SUCCEEDED( pDevice->BeginScene() ) )
@@ -247,66 +215,34 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 		pDevice->EndScene();
 
 		pDevice->SetFVF( curFVF );
-		pDevice->SetRenderTarget( 0, curRT );
-		SAFE_RELEASE( curRT );
 
 		pDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
 		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
 
 #ifdef DEBUG_FREEFORM
-		D3DXSaveTextureToFile( TEXT( "D:\\mask.png" ), D3DXIFF_PNG, m_pScreenTexture, NULL );
-#endif
+		D3DSURFACE_DESC surfaceDesc{};
 
-		SAFE_RELEASE( pScreenSurface );
+		if ( SUCCEEDED( pSurface->GetDesc( &surfaceDesc ) ) ) {
+			LPDIRECT3DTEXTURE9 pScreenshotTexture{};
+
+			if ( SUCCEEDED( pDevice->CreateTexture( surfaceDesc.Width, surfaceDesc.Height, 1, surfaceDesc.Usage, surfaceDesc.Format, surfaceDesc.Pool, &pScreenshotTexture, NULL ) ) ) {
+				LPDIRECT3DSURFACE9 pScreenshotSurface{};
+
+				if ( SUCCEEDED( pScreenshotTexture->GetSurfaceLevel( 0, &pScreenshotSurface ) ) ) {
+					if ( SUCCEEDED( pDevice->StretchRect( pSurface, NULL, pScreenshotSurface, NULL, D3DTEXF_NONE ) ) ) {
+						D3DXSaveTextureToFile( TEXT( "D:\\mask.png" ), D3DXIFF_PNG, pScreenshotTexture, NULL );
+					}
+				}
+
+				SAFE_RELEASE( pScreenshotTexture );
+			}
+		}
+#endif
 	}
 
 	// 뷰 행렬 복원
 	pDevice->SetTransform( D3DTS_VIEW, &curVm );
-
-	// 마스크를 게임 화면에 씌운다
-	if ( SUCCEEDED( pDevice->BeginScene() ) )
-	{
-		DWORD curBlendOp = {};
-		DWORD curSrcBlend = {};
-		DWORD curDestBlend = {};
-		pDevice->GetRenderState( D3DRS_BLENDOP, &curBlendOp );
-		pDevice->GetRenderState( D3DRS_SRCBLEND, &curSrcBlend );
-		pDevice->GetRenderState( D3DRS_DESTBLEND, &curDestBlend );
-
-		DWORD curFVF = {};
-		pDevice->GetFVF( &curFVF );
-		pDevice->SetFVF( m_fvf );
-		pDevice->SetTexture( 0, m_pScreenTexture );
-
-		// 메시 그리기
-		{
-			D3DXMATRIX curWm = {};
-			pDevice->GetTransform( D3DTS_WORLD, &curWm );
-
-			// 이동
-			D3DXMATRIX tm{};
-			D3DXMatrixTranslation( &tm, x, y, 0 );
-			pDevice->SetTransform( D3DTS_WORLD, &tm );
-
-			// 마스크를 반전해서 게임 화면이 그려진 렌더타겟의 색깔과 곱한다
-			// result = src * 0 + dest * ( 1 - srcAlpha )
-			pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-			pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
-			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_DESTCOLOR );
-
-			m_pScreenMesh->DrawSubset( 0 );
-
-			pDevice->SetTransform( D3DTS_WORLD, &curWm );
-		}
-
-		pDevice->EndScene();
-		pDevice->SetFVF( curFVF );
-
-		pDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
-		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
-		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
-	}
 
 	return S_OK;
 }
@@ -458,13 +394,13 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 	return S_OK;
 }
 
-HRESULT CFreeformLight::CreateMaskTexture( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture ) const
+HRESULT CFreeformLight::CreateMaskTexture( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture, UINT width, UINT height )
 {
 	ASSERT( !*pOutTexture );
 
 	LPDIRECT3DTEXTURE9 pTexture = {};
 
-	if ( FAILED( pDevice->CreateTexture( m_displayMode.Width, m_displayMode.Height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pTexture, NULL ) ) ) {
+	if ( FAILED( pDevice->CreateTexture( width, height, 1, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pTexture, NULL ) ) ) {
 		ASSERT( FALSE );
 		return E_FAIL;
 	}
@@ -474,22 +410,23 @@ HRESULT CFreeformLight::CreateMaskTexture( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3D
 	return S_OK;
 }
 
-HRESULT CFreeformLight::CreateMaskMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutMesh ) const
+HRESULT CFreeformLight::CreateMaskMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutMesh, UINT width, UINT height )
 {
 	ASSERT( !*pOutMesh );
 
 	LPD3DXMESH pMesh = {};
 	constexpr auto vertexCount = 4;
 	constexpr auto faceCount = 2;
+	constexpr auto fvf = D3DFVF_XYZ | D3DFVF_TEX1;
 
-	if ( FAILED( D3DXCreateMeshFVF( faceCount, vertexCount, D3DXMESH_MANAGED, m_fvf, pDevice, &pMesh ) ) ) {
+	if ( FAILED( D3DXCreateMeshFVF( faceCount, vertexCount, D3DXMESH_MANAGED, fvf, pDevice, &pMesh ) ) ) {
 		return E_FAIL;
 	}
 
 	// 버텍스 버퍼 채우기
 	{
-		auto w = m_displayMode.Width / 2.f;
-		auto h = m_displayMode.Height / 2.f;
+		auto w = width / 2.f;
+		auto h = height / 2.f;
 
 		const CUSTOM_VERTEX vertices[] = {
 			{ { -w, -h, 0 },{ 0, 0 } },//0
@@ -539,4 +476,38 @@ HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& se
 	}
 
 	return S_OK;
+}
+
+void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool& isVisible )
+{
+	if ( isVisible ) {
+		ImGui::Begin( u8"프리폼", &isVisible );
+
+		auto freeformLightVisible = IsVisible();
+
+		if ( ImGui::Button( freeformLightVisible ? "Remove" : "Add" ) ) {
+			if ( freeformLightVisible ) {
+				RemoveLight();
+			}
+			else {
+				auto x = m_displayMode.Width / 2;
+				auto y = m_displayMode.Height / 2;
+				AddLight( pDevice, xCenter, yCenter );
+			}
+		}
+
+		if ( freeformLightVisible ) {
+			auto newSetting = GetSetting();
+
+			ImGui::ColorEdit3( "Shadow", reinterpret_cast<float*>( &newSetting.shadowColor ) );
+			ImGui::ColorEdit3( "Light", reinterpret_cast<float*>( &newSetting.lightColor ) );
+			ImGui::SliderFloat( "Intensity", &newSetting.intensity, 0.f, 1.f );
+			ImGui::SliderFloat( "Falloff", &newSetting.fallOff, 0, 10 );
+			ImGui::Checkbox( "mask only", &newSetting.maskOnly );
+
+			SetSetting( pDevice, newSetting );
+		}
+
+		ImGui::End();
+	}
 }
