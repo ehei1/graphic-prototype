@@ -10,6 +10,8 @@ public:
 	// 
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();
+	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
+
 	// 조명을 그린다
 	//
 	// pDevice: 조명을 그리는데 쓰는 장치
@@ -63,9 +65,6 @@ private:
 	// 버퍼
 	LPDIRECT3DINDEXBUFFER9 m_pLightIndexBuffer{};
 	LPDIRECT3DVERTEXBUFFER9 m_pLightVertexBuffer{};
-	// 버텍스 개수
-	UINT m_lightVertexCount{};
-	UINT m_lightPrimitiveCount{};
 
 	std::vector< D3DXVECTOR3 > m_topSideVertices{
 		{ -1.f, +1.f, -0.f },
@@ -88,4 +87,10 @@ private:
 	POINT m_position{};
 
 	const int m_lightVertexFvf = D3DFVF_XYZ | D3DFVF_TEX1;
+
+	using Indices = std::vector<WORD>;
+	Indices m_lightIndices;
+
+	using Vertices = std::vector<CUSTOM_VERTEX>;
+	Vertices m_lightVertices;
 };

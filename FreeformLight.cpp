@@ -2,9 +2,10 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <unordered_set>
 #include "FreeformLight.h"
 
-#define DEBUG_FREEFORM
+//#define DEBUG_FREEFORM
 
 
 void CFreeformLight::InvalidateDeviceObjects()
@@ -59,14 +60,10 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 	auto rightTopPoint = addPoints( m_rightSideVectices );
 	auto rightBottomPoint = addPoints( m_bottomSideVertices );
 	auto leftBottomPoint = addPoints( m_leftSideVertices );
-	// 닫는다
-	points.push_back( leftTopPoint );
 
 	auto falloff = m_setting.fallOff;
 
-	using Vertices = std::vector< CUSTOM_VERTEX >;
 	Vertices vertices( points.size(), { centerPoint,{ falloff, falloff } } );
-	ASSERT( vertices.size() == points.size() );
 
 	// 프리폼 조명의 위치를 화면 중앙에 놓는다
 	auto updateVertex = [it = next( points.cbegin() ), i = -1, x, y, scaledWidth, scaledHeight, falloff]( CUSTOM_VERTEX& vertex ) mutable {
@@ -89,7 +86,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 	std::for_each( vertices.begin(), vertices.end(), debugPosition );
 #endif
 
-	auto verticesSize = static_cast<UINT>( sizeof( Vertices::value_type ) * vertices.size() );
+	auto verticesSize = sizeof( Vertices::value_type ) * vertices.size();
 
 	// 버텍스 버퍼 갱신
 	{
@@ -105,20 +102,19 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 			return E_FAIL;
 		}
 
-		memcpy( pVertices, &( *vertices.cbegin() ), verticesSize );
+		memcpy( pVertices, vertices.data(), verticesSize );
 		m_pLightVertexBuffer->Unlock();
 	}
 
 	// 인덱스를 만든다
 	// https://en.cppreference.com/w/cpp/algorithm/generate
 	auto increaseNumber = [n = 0]() mutable { return n++; };
-	using Indices = std::vector<WORD>;
 
-	// 항상 LT 위치로 끝나야 한다
-	Indices indices( points.size(), 1 );
-	// 마지막 위치를 제외하고는 차례대로 번호를 채운다
-	std::generate( indices.begin(), std::prev( indices.end() ), increaseNumber );
-	auto indicesSize = static_cast<UINT>( sizeof( Indices::value_type ) * indices.size() );
+	Indices indices( points.size() );
+	std::generate( indices.begin(), indices.end(), increaseNumber );
+	// 항상 LT 위치에서 끝나야 한다
+	indices.emplace_back( 1 );
+	auto indicesSize = sizeof( Indices::value_type ) * indices.size();
 
 	// 인덱스 버퍼 갱신
 	{
@@ -134,12 +130,12 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 			return E_FAIL;
 		}
 
-		memcpy( pIndices, &( *indices.cbegin() ), indicesSize );
+		memcpy( pIndices, indices.data(), indicesSize );
 		m_pLightIndexBuffer->Unlock();
 	}
 
-	m_lightVertexCount = static_cast<UINT>( points.size() );
-	m_lightPrimitiveCount = static_cast<UINT>( indices.size() - 2 );
+	m_lightVertices = vertices;
+	m_lightIndices = indices;
 
 	return S_OK;
 }
@@ -153,9 +149,6 @@ HRESULT CFreeformLight::RemoveLight()
 
 	SAFE_RELEASE( m_pLightIndexBuffer );
 	SAFE_RELEASE( m_pLightVertexBuffer );
-
-	m_lightVertexCount = 0;
-	m_lightPrimitiveCount = 0;
 
 	return S_OK;
 }
@@ -195,6 +188,8 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		D3DVERTEXBUFFER_DESC vertexBufferDesc = {};
 		m_pLightVertexBuffer->GetDesc( &vertexBufferDesc );
 
+		auto primitiveCount = m_lightIndices.size() - 2;
+
 		DWORD curFVF = {};
 		pDevice->GetFVF( &curFVF );
 		pDevice->SetFVF( vertexBufferDesc.FVF );
@@ -206,9 +201,9 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
 		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
-		pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, vertexBufferDesc.Size / m_lightVertexCount );
+		pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, sizeof( Vertices::value_type ) );
 		pDevice->SetIndices( m_pLightIndexBuffer );
-		pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, m_lightVertexCount, 0, m_lightPrimitiveCount );
+		pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, m_lightVertices.size(), 0, primitiveCount );
 		pDevice->EndScene();
 
 		pDevice->SetFVF( curFVF );
@@ -505,77 +500,101 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 
 		ImGui::End();
 
-		if ( freeformLightVisible ) {			
-			using Words = std::vector<WORD>;
+		if ( freeformLightVisible ) {
+			// 이동 가능한 단추를 그린다. 사실은 부유 창. 
+			// 첫째 점은 원점이며, 마지막 점은 첫번째 정점으로 돌아오는 점이므로 그리지 않는다
+			for ( auto i = 0; i < m_lightIndices.size() - 1; ++i ) {
+				auto index = m_lightIndices[i];
+				auto& vertex = m_lightVertices[index];
+				auto name = std::to_string( i );
+				auto windowPos = ImVec2{ vertex.position.x, vertex.position.y };
 
-			// 인덱스 추출
-			auto getUniqueIndices = [pBuffer = m_pLightIndexBuffer]() {
-				D3DINDEXBUFFER_DESC desc{};
-				pBuffer->GetDesc( &desc );
-				ASSERT( desc.Format == D3DFMT_INDEX16 );
-				ASSERT( sizeof( WORD ) == 2 );
+				// 단추 그림
+				{
+					ImGui::SetNextWindowPos( windowPos, i ? ImGuiCond_Once : ImGuiCond_Always );
+					ImGui::SetNextWindowSize( { 5, 5 }, ImGuiCond_Always );
+					
+					if ( ImGui::Begin( name.c_str(), 0, ImGuiWindowFlags_NoDecoration ) ) {
+						auto nextWindowPos = ImGui::GetWindowPos();
 
-				LPVOID pData{};
-				pBuffer->Lock( 0, desc.Size, &pData, 0 );
+						if ( i != 0 ) {
+							if ( windowPos.x != nextWindowPos.x || windowPos.y != nextWindowPos.y ) {
+								UpdateLightVertex( index, { nextWindowPos.x, nextWindowPos.y, 0 } );
+							}
+						}
 
-				auto count = desc.Size / sizeof( Words::value_type );
-				Words words( count );
-				memcpy( words.data(), pData, desc.Size );
-
-				pBuffer->Unlock();
-
-				return words;
-			};
-			auto indices = getUniqueIndices();
-			// 최초는 중심점인데 필요 없어 제외
-			indices.erase( std::cbegin( indices ) );
-			// 마지막 것도 필요 없어 제외
-			indices.pop_back();
-
-			using Vertices = std::vector<CUSTOM_VERTEX>;
-
-			// 버텍스 추출
-			auto getVertices = [pBuffer = m_pLightVertexBuffer, fvf = m_lightVertexFvf]() {
-				D3DVERTEXBUFFER_DESC desc{};
-				pBuffer->GetDesc( &desc );
-				ASSERT( desc.FVF == fvf );
-
-				LPVOID pData{};
-				pBuffer->Lock( 0, desc.Size, &pData, 0 );
-
-				auto count = desc.Size / sizeof( Vertices::value_type );
-				Vertices vertices( count );
-				memcpy( vertices.data(), pData, desc.Size );
-
-				pBuffer->Unlock();
-
-				return vertices;
-			};
-			auto vertices = getVertices();
-
-#ifdef _DEBUG
-			{
-				auto minmax = std::minmax_element( std::cbegin( indices ), std::cend( indices ) );
-				ASSERT( *minmax.first > -1 && *minmax.second < vertices.size() );
-			}
-#endif
-
-			// 이동 가능한 단추를 그린다. 사실은 부유 창
-			for ( auto i = 0; i < indices.size(); ++i ) {
-				auto index = indices[i];
-				auto& vertex = vertices[index];
-				auto name = std::to_string( i + 1 );
-				
-				ImGui::SetNextWindowPos( { vertex.position.x, vertex.position.y }, ImGuiCond_Once );
-				ImGui::Begin( name.c_str(), 0, ImGuiWindowFlags_NoDecoration );
-				ImGui::LabelText( ".", name.c_str() );
-				ImGui::End();
+						ImGui::LabelText( ".", name.c_str() );
+						ImGui::End();
+					}
+				}
 			}
 
 			// 선을 그린다
+			{
+				auto drawList = ImGui::GetBackgroundDrawList();
 
-			// 처음 시작된 점과 만나기 위해 끝에 넣는다. 끝에는 중심 버텍스 정보가 있다
-			indices.emplace_back( indices.front() );
+				for ( auto i = 2; i < m_lightIndices.size(); ++i ) {
+					auto index0 = m_lightIndices[i - 1];
+					auto index1 = m_lightIndices[i];
+					auto& vertex0 = m_lightVertices[index0];
+					auto& vertex1 = m_lightVertices[index1];
+
+					drawList->AddLine( { vertex0.position.x, vertex0.position.y }, { vertex1.position.x, vertex1.position.y }, ImColor{ 255,0,0 } );
+				}
+			}
 		}
 	}
+}
+
+HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3& position )
+{
+	if ( m_pLightVertexBuffer ) {
+		for ( auto index : m_lightIndices ) {
+			if ( updatingIndex == index ) {
+				m_lightVertices[index].position = position;
+
+				// 중점 수정
+				{
+					auto area = 0.f;
+					auto centerX = 0.f;
+					auto centerY = 0.f;
+
+					for ( auto i = 1; i < m_lightVertices.size() - 1; ++i ) {
+						auto& p0 = m_lightVertices[i].position;
+						auto& p1 = m_lightVertices[i + 1].position;
+						auto f = p0.x * p1.y - p1.x * p0.y;
+
+						area += f;
+						centerX += ( p0.x + p1.x ) * f;
+						centerY += ( p0.y + p1.y ) * f;
+					}
+
+					auto vertexCount = static_cast<float>( m_lightVertices.size() - 1 );
+					area *= 0.5 * vertexCount;
+					centerX /= area;
+					centerY /= area;
+
+					m_lightVertices[0].position = { centerX, centerY, 0 };
+				}
+
+				// 비디오 메모리에 복사
+				{
+					LPVOID pVertices{};
+					auto size = m_lightVertices.size() * sizeof( Vertices::value_type );
+
+					if ( FAILED( m_pLightVertexBuffer->Lock( 0, size, &pVertices, 0 ) ) ) {
+						ASSERT( FALSE );
+						return E_FAIL;
+					}
+
+					memcpy( pVertices, m_lightVertices.data(), size );
+					m_pLightVertexBuffer->Unlock();
+				}
+				
+				return S_OK;
+			}
+		}
+	}
+
+	return E_FAIL;
 }
