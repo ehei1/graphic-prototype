@@ -25,7 +25,7 @@ public:
 	inline bool IsVisible() const { return !!m_pLightVertexBuffer; }
 
 	// 개발 용도의 imgui 창을 만든다
-	void CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool& isVisible );
+	void CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool isVisible );
 
 	struct Setting
 	{
@@ -41,8 +41,8 @@ public:
 	inline const Setting& GetSetting() const { return m_setting; }
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
 
-	static HRESULT CreateMaskMesh( LPDIRECT3DDEVICE9, LPD3DXMESH*, UINT width, UINT height );
-	static HRESULT CreateMaskTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9*, UINT width, UINT height );
+	static HRESULT CreateMesh( LPDIRECT3DDEVICE9, LPD3DXMESH*, UINT width, UINT height );
+	static HRESULT CreateTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9*, UINT width, UINT height );
 
 private:
 	// 프리폼 조명을 위한 텍스처를 만든다
@@ -66,17 +66,17 @@ private:
 	LPDIRECT3DINDEXBUFFER9 m_pLightIndexBuffer{};
 	LPDIRECT3DVERTEXBUFFER9 m_pLightVertexBuffer{};
 
-	std::vector< D3DXVECTOR3 > m_topSideVertices{
+	std::vector< D3DXVECTOR3 > m_leftBottomVertices{
 		{ -1.f, +1.f, -0.f },
 	};
-	std::vector< D3DXVECTOR3 > m_rightSideVectices{
+	std::vector< D3DXVECTOR3 > m_rightBottomVertices{
 		{ +1.0f, +1.f, 0.f },
 		//{ +1.5f,  0.f, 0.f },
 	};
-	std::vector< D3DXVECTOR3 > m_bottomSideVertices{
+	std::vector< D3DXVECTOR3 > m_rightTopSideVertices{
 		{ +1.f, -1.f, 0.f },
 	};
-	std::vector< D3DXVECTOR3 > m_leftSideVertices{
+	std::vector< D3DXVECTOR3 > m_leftTopSideVertices{
 		{ -1.0f, -1.f, 0.f },
 		//{ -1.5f, -1.f, 0.f },
 		//{ -1.0f,  0.f, 0.f },
@@ -93,4 +93,6 @@ private:
 
 	using Vertices = std::vector<CUSTOM_VERTEX>;
 	Vertices m_lightVertices;
+
+	std::vector<bool> m_vertexEditingStates;
 };

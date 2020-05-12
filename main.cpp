@@ -43,6 +43,8 @@ LPD3DXMESH				g_pScreenMesh = NULL;
 LPDIRECT3DTEXTURE9		g_pScreenTexture = NULL;
 std::unique_ptr<CFreeformLight> g_pFreemformLight{ new CFreeformLight };
 const D3DDISPLAYMODE	gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
+float					gScale = 100;
+D3DXVECTOR2				gTranslation{};
 
 // A structure for our custom vertex type. We added texture coordinates
 struct CUSTOM_VERTEX
@@ -173,8 +175,8 @@ HRESULT InitGeometry()
 		}
 	}
 
-	g_pFreemformLight->CreateMaskMesh( g_pd3dDevice, &g_pScreenMesh, gDisplayMode.Width, gDisplayMode.Height );
-	g_pFreemformLight->CreateMaskTexture( g_pd3dDevice, &g_pScreenTexture, gDisplayMode.Width, gDisplayMode.Height );
+	g_pFreemformLight->CreateMesh( g_pd3dDevice, &g_pScreenMesh, gDisplayMode.Width, gDisplayMode.Height );
+	g_pFreemformLight->CreateTexture( g_pd3dDevice, &g_pScreenTexture, gDisplayMode.Width, gDisplayMode.Height );
 
     return S_OK;
 }
@@ -270,6 +272,14 @@ VOID Render()
 		D3DXMATRIX view{};
 		D3DXMatrixLookAtLH( &view, &eye, &at, &up );
 
+		D3DXMATRIX scale{};
+		D3DXMatrixScaling( &scale, gScale / 100.f, gScale / 100.f, 1 );
+		view *= scale;
+
+		D3DXMATRIX translation{};
+		D3DXMatrixTranslation( &translation, gTranslation.x, gTranslation.y, 0 );
+		view *= translation;
+
 		g_pd3dDevice->SetTransform( D3DTS_VIEW, &view );
 	}
 
@@ -322,7 +332,6 @@ VOID Render()
 			g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
 			g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 
-			
 #ifdef DEBUG_SAMPLE
 			D3DXSaveTextureToFile( L"D:\\screenshot.png", D3DXIFF_PNG, g_pMainScreenTexture, NULL );
 #endif
@@ -430,15 +439,20 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
             return 0;
 		case WM_KEYDOWN:
 			switch ( wParam ) {
-			case 0x5a: // z
-			{
-				auto x = gDisplayMode.Width / 2;
-				auto y = gDisplayMode.Height / 2;
-				g_pFreemformLight->AddLight( g_pd3dDevice, x, y );
+			case VK_LEFT:
+				--gTranslation.x;
 				break;
-			}
-			case 0x58: // x
-				g_pFreemformLight->RemoveLight();
+			case VK_RIGHT:
+				++gTranslation.x;
+				break;
+			case VK_UP:
+				--gTranslation.y;
+				break;
+			case VK_DOWN:
+				++gTranslation.y;
+				break;
+			case VK_HOME:
+				gTranslation = {};
 				break;
 			}
 
@@ -513,10 +527,18 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 			auto showWindow = true;
 
             // Enter the message loop
-            MSG msg;
-            ZeroMemory( &msg, sizeof( msg ) );
+			MSG msg{};
+
             while( msg.message != WM_QUIT )
             {
+				if ( msg.message == WM_MOUSEWHEEL ) {
+					auto delta = GET_WHEEL_DELTA_WPARAM( msg.wParam ) / static_cast<float>( WHEEL_DELTA );
+					gScale += delta;
+
+					gScale = max( gScale, 100 );
+					gScale = min( gScale, 200 );
+				}
+
                 if( PeekMessage( &msg, NULL, 0U, 0U, PM_REMOVE ) )
                 {
 					TranslateMessage( &msg );
@@ -535,6 +557,8 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				auto xCenter = gDisplayMode.Width / 2;
 				auto yCenter = gDisplayMode.Height / 2;
 				g_pFreemformLight->CreateImgui( g_pd3dDevice, xCenter, yCenter, showWindow );
+
+				//ImGui::ShowDemoWindow();
 
 				// Rendering
 				ImGui::EndFrame();

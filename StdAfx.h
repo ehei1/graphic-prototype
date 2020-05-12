@@ -13,6 +13,7 @@
 #include <Windows.h>
 
 #include "imgui\imgui.h"
+#include "imgui_internal.h"
 #include "imgui\examples\imgui_impl_dx9.h"
 #include "imgui\examples\imgui_impl_win32.h"
 

@@ -49,17 +49,10 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 	auto scaledWidth = m_displayMode.Width / 4;
 	auto scaledHeight = m_displayMode.Height / 4;
 
-	auto addPoints = [&points, scaledWidth, scaledHeight]( const std::vector<D3DXVECTOR3 >& sideVertices ) {
-		points.insert( points.end(), sideVertices.begin(), sideVertices.end() );
-
-		return *sideVertices.begin();
-	};
-
 	// 시계 방향으로 면을 살피면서 점을 추가한다
-	auto leftTopPoint = addPoints( m_topSideVertices );
-	auto rightTopPoint = addPoints( m_rightSideVectices );
-	auto rightBottomPoint = addPoints( m_bottomSideVertices );
-	auto leftBottomPoint = addPoints( m_leftSideVertices );
+	for ( auto vertices : { m_leftTopSideVertices, m_rightTopSideVertices, m_rightBottomVertices, m_leftBottomVertices } ) {
+		points.insert( points.end(), vertices.begin(), vertices.end() );
+	}
 
 	auto falloff = m_setting.fallOff;
 
@@ -136,6 +129,9 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 	m_lightVertices = vertices;
 	m_lightIndices = indices;
+
+	m_vertexEditingStates.clear();
+	m_vertexEditingStates.resize( vertices.size() );
 
 	return S_OK;
 }
@@ -386,7 +382,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 	return S_OK;
 }
 
-HRESULT CFreeformLight::CreateMaskTexture( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture, UINT width, UINT height )
+HRESULT CFreeformLight::CreateTexture( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture, UINT width, UINT height )
 {
 	ASSERT( !*pOutTexture );
 
@@ -402,7 +398,7 @@ HRESULT CFreeformLight::CreateMaskTexture( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3D
 	return S_OK;
 }
 
-HRESULT CFreeformLight::CreateMaskMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutMesh, UINT width, UINT height )
+HRESULT CFreeformLight::CreateMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutMesh, UINT width, UINT height )
 {
 	ASSERT( !*pOutMesh );
 
@@ -470,7 +466,7 @@ HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& se
 	return S_OK;
 }
 
-void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool& isVisible )
+void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool isVisible )
 {
 	if ( isVisible ) {
 		ImGui::Begin( u8"프리폼", &isVisible );
@@ -501,26 +497,54 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 		ImGui::End();
 
 		if ( freeformLightVisible ) {
+			D3DXMATRIX world{};
+			pDevice->GetTransform( D3DTS_WORLD, &world );
+			D3DXMATRIX view{};
+			pDevice->GetTransform( D3DTS_VIEW, &view );
+			D3DXMATRIX projection{};
+			pDevice->GetTransform( D3DTS_PROJECTION, &projection );
+			D3DVIEWPORT9 viewport{};
+			pDevice->GetViewport( &viewport );
+
+			using Coords = std::vector<D3DXVECTOR3>;
+			Coords coords{ m_lightVertices.size() };
+
+			auto projectToScreen = [it = m_lightVertices.cbegin(), &world, &view, &projection, &viewport]( auto& position ) mutable{
+				D3DXVec3Project( &position, &( it->position ), &viewport, &projection, &view, &world );
+				++it;
+			};
+			std::for_each( std::begin( coords ), std::end( coords ), projectToScreen );
+
 			// 이동 가능한 단추를 그린다. 사실은 부유 창. 
 			// 첫째 점은 원점이며, 마지막 점은 첫번째 정점으로 돌아오는 점이므로 그리지 않는다
-			for ( auto i = 0; i < m_lightIndices.size() - 1; ++i ) {
+			for ( auto i = 0; i < coords.size(); ++i ) {
 				auto index = m_lightIndices[i];
-				auto& vertex = m_lightVertices[index];
+				auto& coord = coords[index];
 				auto name = std::to_string( i );
-				auto windowPos = ImVec2{ vertex.position.x, vertex.position.y };
 
 				// 단추 그림
 				{
-					ImGui::SetNextWindowPos( windowPos, i ? ImGuiCond_Once : ImGuiCond_Always );
-					ImGui::SetNextWindowSize( { 5, 5 }, ImGuiCond_Always );
-					
-					if ( ImGui::Begin( name.c_str(), 0, ImGuiWindowFlags_NoDecoration ) ) {
-						auto nextWindowPos = ImGui::GetWindowPos();
+					auto&& isEditing = m_vertexEditingStates[i];
 
-						if ( i != 0 ) {
-							if ( windowPos.x != nextWindowPos.x || windowPos.y != nextWindowPos.y ) {
-								UpdateLightVertex( index, { nextWindowPos.x, nextWindowPos.y, 0 } );
-							}
+					ImGui::SetNextWindowPos( { coord.x, coord.y }, isEditing ? ImGuiCond_Once : ImGuiCond_Always );
+					ImGui::SetNextWindowSize( { 5, 5 }, ImGuiCond_Always );
+
+					if ( ImGui::Begin( name.c_str(), 0, ImGuiWindowFlags_NoDecoration ) ) {
+						isEditing = ImGui::IsItemActive();
+						auto nextPos = ImGui::GetWindowPos();
+
+						using Position = std::pair<int, int>;
+						Position p0{ static_cast<int>( coord.x ), static_cast<int>( coord.y ) };
+						Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
+						
+						if ( p0 != p1 ) {
+							D3DXVECTOR3 out{};
+							D3DXVec3Unproject( &out, &D3DXVECTOR3{ nextPos.x, nextPos.y, 0.f }, &viewport, &projection, &view, &world );
+							out.z = {};
+
+							auto x = nextPos.x;
+							auto y = nextPos.y;
+							UpdateLightVertex( index, out );
 						}
 
 						ImGui::LabelText( ".", name.c_str() );
@@ -536,10 +560,13 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 				for ( auto i = 2; i < m_lightIndices.size(); ++i ) {
 					auto index0 = m_lightIndices[i - 1];
 					auto index1 = m_lightIndices[i];
-					auto& vertex0 = m_lightVertices[index0];
-					auto& vertex1 = m_lightVertices[index1];
+					auto& coord0 = coords[index0];
+					auto& coord1 = coords[index1];
 
-					drawList->AddLine( { vertex0.position.x, vertex0.position.y }, { vertex1.position.x, vertex1.position.y }, ImColor{ 255,0,0 } );
+					ImVec2 from{ coord0.x, coord0.y };
+					ImVec2 to{ coord1.x, coord1.y };
+
+					drawList->AddLine( from, to, ImColor{ 255,0,0 } );
 				}
 			}
 		}
@@ -553,29 +580,31 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 			if ( updatingIndex == index ) {
 				m_lightVertices[index].position = position;
 
-				// 중점 수정
-				{
-					auto area = 0.f;
-					auto centerX = 0.f;
-					auto centerY = 0.f;
+				//// 중점 수정
+				//{
+				//	auto area = 0.f;
+				//	auto centerX = 0.f;
+				//	auto centerY = 0.f;
+				//	Vertices vertices{ std::next( std::cbegin( m_lightVertices ) ), std::cend( m_lightVertices ) };
 
-					for ( auto i = 1; i < m_lightVertices.size() - 1; ++i ) {
-						auto& p0 = m_lightVertices[i].position;
-						auto& p1 = m_lightVertices[i + 1].position;
-						auto f = p0.x * p1.y - p1.x * p0.y;
+				//	for ( auto i = 0; i < vertices.size(); ++i ) {
+				//		auto nextIndex = ( i + 1 ) % vertices.size();
+				//		auto& p0 = vertices[i].position;
+				//		auto& p1 = vertices[nextIndex].position;
+				//		auto f = p0.x * p1.y - p1.x * p0.y;
 
-						area += f;
-						centerX += ( p0.x + p1.x ) * f;
-						centerY += ( p0.y + p1.y ) * f;
-					}
+				//		area += f;
+				//		centerX += ( p0.x + p1.x ) * f;
+				//		centerY += ( p0.y + p1.y ) * f;
+				//	}
 
-					auto vertexCount = static_cast<float>( m_lightVertices.size() - 1 );
-					area *= 0.5 * vertexCount;
-					centerX /= area;
-					centerY /= area;
+				//	area *= 0.5 * vertices.size();
 
-					m_lightVertices[0].position = { centerX, centerY, 0 };
-				}
+				//	centerX /= area;
+				//	centerY /= area;
+
+				//	m_lightVertices[0].position = { centerX, centerY, 0 };
+				//}
 
 				// 비디오 메모리에 복사
 				{
@@ -590,7 +619,7 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 					memcpy( pVertices, m_lightVertices.data(), size );
 					m_pLightVertexBuffer->Unlock();
 				}
-				
+
 				return S_OK;
 			}
 		}
