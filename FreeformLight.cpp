@@ -54,7 +54,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 		points.insert( points.end(), vertices.begin(), vertices.end() );
 	}
 
-	auto falloff = m_setting.fallOff;
+	auto falloff = m_setting.falloff;
 
 	Vertices vertices( points.size(), { centerPoint,{ falloff, falloff } } );
 
@@ -88,15 +88,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 			return E_FAIL;
 		}
 
-		LPVOID pVertices{};
-
-		if ( FAILED( m_pLightVertexBuffer->Lock( 0, verticesSize, &pVertices, 0 ) ) ) {
-			ASSERT( FALSE );
-			return E_FAIL;
-		}
-
-		memcpy( pVertices, vertices.data(), verticesSize );
-		m_pLightVertexBuffer->Unlock();
+		CopyToMemory( m_pLightVertexBuffer, vertices.data(), verticesSize );
 	}
 
 	// 인덱스를 만든다
@@ -452,28 +444,24 @@ HRESULT CFreeformLight::CreateMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutM
 HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& setting )
 {
 	if ( m_setting != setting ) {
-		m_setting = setting;
-
 		if ( IsVisible() ) {
-			SAFE_RELEASE( m_pLightTexture );
-			CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting );
-			RemoveLight();
-
-			AddLight( pDevice, m_position.x, m_position.y );
+			UpdateLight( pDevice, setting );
 		}
+
+		m_setting = setting;
 	}
 
 	return S_OK;
 }
 
-void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool isVisible )
+void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool& isVisible )
 {
 	if ( isVisible ) {
 		ImGui::Begin( u8"프리폼", &isVisible );
 
 		auto freeformLightVisible = IsVisible();
 
-		if ( ImGui::Button( freeformLightVisible ? "Remove" : "Add" ) ) {
+		if ( ImGui::Button( freeformLightVisible ? u8"삭제" : u8"추가" ) ) {
 			if ( freeformLightVisible ) {
 				RemoveLight();
 			}
@@ -484,19 +472,19 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 
 		if ( freeformLightVisible ) {
 			auto newSetting = GetSetting();
-
-			ImGui::ColorEdit3( "Shadow", reinterpret_cast<float*>( &newSetting.shadowColor ) );
-			ImGui::ColorEdit3( "Light", reinterpret_cast<float*>( &newSetting.lightColor ) );
-			ImGui::SliderFloat( "Intensity", &newSetting.intensity, 0.f, 1.f );
-			ImGui::SliderFloat( "Falloff", &newSetting.fallOff, 0, 10 );
-			ImGui::Checkbox( "mask only", &newSetting.maskOnly );
+			ImGui::ColorEdit3( u8"그림자", reinterpret_cast<float*>( &newSetting.shadowColor ) );
+			ImGui::ColorEdit3( u8"빛", reinterpret_cast<float*>( &newSetting.lightColor ) );
+			ImGui::SliderFloat( u8"강도", &newSetting.intensity, 0.f, 1.f );
+			ImGui::SliderFloat( u8"드리움", &newSetting.falloff, 0, 10 );
+			ImGui::Checkbox( u8"도우미", &newSetting.helper );
+			ImGui::Checkbox( u8"마스크", &newSetting.maskOnly );
 
 			SetSetting( pDevice, newSetting );
 		}
 
 		ImGui::End();
 
-		if ( freeformLightVisible ) {
+		if ( freeformLightVisible && m_setting.helper ) {
 			D3DXMATRIX world{};
 			pDevice->GetTransform( D3DTS_WORLD, &world );
 			D3DXMATRIX view{};
@@ -566,7 +554,10 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 					ImVec2 from{ coord0.x, coord0.y };
 					ImVec2 to{ coord1.x, coord1.y };
 
-					drawList->AddLine( from, to, ImColor{ 255,0,0 } );
+					drawList->AddLine( from, to, ImColor{ 255,0,0 }, 2 );
+
+					// 정점 추가를 위해 사용할 imgui 브랜치 설명
+					// https://github.com/ocornut/imgui/pull/1512
 				}
 			}
 		}
@@ -606,24 +597,56 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 				//	m_lightVertices[0].position = { centerX, centerY, 0 };
 				//}
 
-				// 비디오 메모리에 복사
-				{
-					LPVOID pVertices{};
-					auto size = m_lightVertices.size() * sizeof( Vertices::value_type );
-
-					if ( FAILED( m_pLightVertexBuffer->Lock( 0, size, &pVertices, 0 ) ) ) {
-						ASSERT( FALSE );
-						return E_FAIL;
-					}
-
-					memcpy( pVertices, m_lightVertices.data(), size );
-					m_pLightVertexBuffer->Unlock();
-				}
-
+				CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), m_lightVertices.size() * sizeof( Vertices::value_type ) );
 				return S_OK;
 			}
 		}
 	}
 
 	return E_FAIL;
+}
+
+HRESULT CFreeformLight::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& setting )
+{
+	// 텍스처 수정
+	if ( m_pLightTexture && ( m_setting.lightColor != setting.lightColor || m_setting.intensity != setting.intensity ) ) {
+		SAFE_RELEASE( m_pLightTexture );
+
+		CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting );
+	}
+
+	// uv 수정
+	if ( m_setting.falloff != setting.falloff ) {
+		auto falloff = setting.falloff;
+
+		if ( !m_lightVertices.empty() ) {
+			m_lightVertices[0].uv = { falloff, falloff };
+
+			auto updateFalloff = [i = -1, falloff]( CUSTOM_VERTEX& customVertex ) mutable {
+				customVertex.uv = ( ++i % 2 ? D3DXVECTOR2{ falloff, 0 } : D3DXVECTOR2{ 0, 0 } );
+			};
+			std::for_each( std::next( std::begin( m_lightVertices ) ), std::end( m_lightVertices ), updateFalloff );
+
+			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), m_lightVertices.size() * sizeof( Vertices::value_type ) );
+		}
+	}
+
+	return S_OK;
+}
+
+HRESULT CFreeformLight::CopyToMemory( LPDIRECT3DVERTEXBUFFER9 dest, LPVOID src, size_t size ) const
+{
+	ASSERT( size );
+
+	LPVOID pVertices{};
+
+	if ( FAILED( dest->Lock( 0, size, &pVertices, 0 ) ) ) {
+		ASSERT( FALSE );
+		return E_FAIL;
+	}
+
+	memcpy( pVertices, src, size );
+	dest->Unlock();
+
+	return S_OK;
 }

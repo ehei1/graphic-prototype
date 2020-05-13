@@ -453,6 +453,7 @@ LRESULT WINAPI MsgProc( HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam )
 				break;
 			case VK_HOME:
 				gTranslation = {};
+				gScale = 100;
 				break;
 			}
 
@@ -535,7 +536,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 					auto delta = GET_WHEEL_DELTA_WPARAM( msg.wParam ) / static_cast<float>( WHEEL_DELTA );
 					gScale += delta;
 
-					gScale = max( gScale, 100 );
+					gScale = max( gScale, 50 );
 					gScale = min( gScale, 200 );
 				}
 

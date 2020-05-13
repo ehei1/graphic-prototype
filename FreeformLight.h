@@ -7,10 +7,23 @@
 class CFreeformLight
 {
 public:
+	struct Setting
+	{
+		D3DXCOLOR lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
+		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 0, 0, 0 );
+		float intensity = 1.f;
+		float falloff = 1.f;
+		bool maskOnly{};
+		bool helper{};
+
+		inline bool operator==( const Setting& setting ) const { return !memcmp( &setting, this, sizeof( setting ) ); }
+		inline bool operator!=( const Setting& setting ) const { return !( *this == setting ); }
+	};
+
 	// 
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();
-	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
+	HRESULT UpdateLight( LPDIRECT3DDEVICE9, const Setting& );
 
 	// 조명을 그린다
 	//
@@ -25,19 +38,7 @@ public:
 	inline bool IsVisible() const { return !!m_pLightVertexBuffer; }
 
 	// 개발 용도의 imgui 창을 만든다
-	void CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool isVisible );
-
-	struct Setting
-	{
-		D3DXCOLOR lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
-		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 0, 0, 0 );
-		float intensity = 1.f;
-		float fallOff = 1.f;
-		bool maskOnly{};
-
-		inline bool operator==( const Setting& setting ) const { return !memcmp( &setting, this, sizeof( setting ) ); }
-		inline bool operator!=( const Setting& setting ) const { return !( *this == setting ); }
-	};
+	void CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool& isVisible );
 	inline const Setting& GetSetting() const { return m_setting; }
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
 
@@ -52,6 +53,8 @@ private:
 	HRESULT CreateLightTextureByRenderer( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture ) const;
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
+	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
+	HRESULT CopyToMemory( LPDIRECT3DVERTEXBUFFER9 dest, LPVOID src, size_t size ) const;
 
 private:
 	struct CUSTOM_VERTEX {
@@ -66,20 +69,20 @@ private:
 	LPDIRECT3DINDEXBUFFER9 m_pLightIndexBuffer{};
 	LPDIRECT3DVERTEXBUFFER9 m_pLightVertexBuffer{};
 
-	std::vector< D3DXVECTOR3 > m_leftBottomVertices{
-		{ -1.f, +1.f, -0.f },
+	std::vector< D3DXVECTOR3 > m_leftTopSideVertices{
+		{ -1.0f, -1.f, 0.f },
+	};
+	std::vector< D3DXVECTOR3 > m_rightTopSideVertices{
+		{ +1.f, -1.f, 0.f },
+		{ +1.5f, 0.f, 0.f },
 	};
 	std::vector< D3DXVECTOR3 > m_rightBottomVertices{
 		{ +1.0f, +1.f, 0.f },
 		//{ +1.5f,  0.f, 0.f },
 	};
-	std::vector< D3DXVECTOR3 > m_rightTopSideVertices{
-		{ +1.f, -1.f, 0.f },
-	};
-	std::vector< D3DXVECTOR3 > m_leftTopSideVertices{
-		{ -1.0f, -1.f, 0.f },
-		//{ -1.5f, -1.f, 0.f },
-		//{ -1.0f,  0.f, 0.f },
+	std::vector< D3DXVECTOR3 > m_leftBottomVertices{
+		{ -1.f, +1.f, 0.f },
+		{ -1.5f, 0.f, 0.f },
 	};
 	D3DDISPLAYMODE m_displayMode{};
 
