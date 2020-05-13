@@ -119,9 +119,6 @@ HRESULT InitD3D( HWND hWnd )
     return S_OK;
 }
 
-static size_t gVertexCount = 0;
-static size_t gIndexCount = 0;
-
 //-----------------------------------------------------------------------------
 // Name: InitGeometry()
 // Desc: Create the Textures and vertex buffers

@@ -5,6 +5,8 @@
 #include <memory>
 
 #include <assert.h>
+// https://dxlib.xsrv.jp/cgi/patiobbs/patio.cgi?mode=view&no=3882
+struct IUnknown;
 #include <d3dx9.h>
 #define DIRECTINPUT_VERSION 0x0800
 #include <dinput.h>

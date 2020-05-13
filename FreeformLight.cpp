@@ -23,7 +23,7 @@ HRESULT CFreeformLight::RestoreDevice( const D3DDISPLAYMODE& displayMode )
 
 HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 {
-	// TODO ¸Ş½Ã·Î ¹Ù²Ù±â
+	// TODO ë©”ì‹œë¡œ ë°”ê¾¸ê¸°
 	ASSERT( pDevice );
 
 	if ( m_pLightVertexBuffer ) {
@@ -32,7 +32,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 	m_position = { x, y };
 
-	// ÃÊ±âÈ­
+	// ì´ˆê¸°í™”
 	if ( !m_pLightTexture ) {
 		if ( FAILED( CreateLightTextureByLockRect( pDevice, &m_pLightTexture, m_setting ) ) ) {
 			ASSERT( FALSE );
@@ -45,11 +45,11 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 	D3DXVECTOR3 centerPoint{ static_cast<float>( x ), static_cast<float>( y ),{} };
 	using Points = std::vector< D3DXVECTOR3 >;
 	Points points{ centerPoint };
-	// È­¸éÀÇ Àı¹İ¸¸ Â÷ÁöÇÏµµ·Ï ÇÑ´Ù
+	// í™”ë©´ì˜ ì ˆë°˜ë§Œ ì°¨ì§€í•˜ë„ë¡ í•œë‹¤
 	auto scaledWidth = m_displayMode.Width / 4;
 	auto scaledHeight = m_displayMode.Height / 4;
 
-	// ½Ã°è ¹æÇâÀ¸·Î ¸éÀ» »ìÇÇ¸é¼­ Á¡À» Ãß°¡ÇÑ´Ù
+	// ì‹œê³„ ë°©í–¥ìœ¼ë¡œ ë©´ì„ ì‚´í”¼ë©´ì„œ ì ì„ ì¶”ê°€í•œë‹¤
 	for ( auto vertices : { m_leftTopSideVertices, m_rightTopSideVertices, m_rightBottomVertices, m_leftBottomVertices } ) {
 		points.insert( points.end(), vertices.begin(), vertices.end() );
 	}
@@ -58,7 +58,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 	Vertices vertices( points.size(), { centerPoint,{ falloff, falloff } } );
 
-	// ÇÁ¸®Æû Á¶¸íÀÇ À§Ä¡¸¦ È­¸é Áß¾Ó¿¡ ³õ´Â´Ù
+	// í”„ë¦¬í¼ ì¡°ëª…ì˜ ìœ„ì¹˜ë¥¼ í™”ë©´ ì¤‘ì•™ì— ë†“ëŠ”ë‹¤
 	auto updateVertex = [it = next( points.cbegin() ), i = -1, x, y, scaledWidth, scaledHeight, falloff]( CUSTOM_VERTEX& vertex ) mutable {
 		auto position = *it++;
 		auto newPosition = D3DXVECTOR3{ position.x * scaledWidth, position.y * scaledHeight, 0 };
@@ -81,7 +81,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 	auto verticesSize = sizeof( Vertices::value_type ) * vertices.size();
 
-	// ¹öÅØ½º ¹öÆÛ °»½Å
+	// ë²„í…ìŠ¤ ë²„í¼ ê°±ì‹ 
 	{
 		if ( FAILED( pDevice->CreateVertexBuffer( verticesSize, 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &m_pLightVertexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
@@ -91,17 +91,17 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 		CopyToMemory( m_pLightVertexBuffer, vertices.data(), verticesSize );
 	}
 
-	// ÀÎµ¦½º¸¦ ¸¸µç´Ù
+	// ì¸ë±ìŠ¤ë¥¼ ë§Œë“ ë‹¤
 	// https://en.cppreference.com/w/cpp/algorithm/generate
 	auto increaseNumber = [n = 0]() mutable { return n++; };
 
 	Indices indices( points.size() );
 	std::generate( indices.begin(), indices.end(), increaseNumber );
-	// Ç×»ó LT À§Ä¡¿¡¼­ ³¡³ª¾ß ÇÑ´Ù
+	// í•­ìƒ LT ìœ„ì¹˜ì—ì„œ ëë‚˜ì•¼ í•œë‹¤
 	indices.emplace_back( 1 );
 	auto indicesSize = sizeof( Indices::value_type ) * indices.size();
 
-	// ÀÎµ¦½º ¹öÆÛ °»½Å
+	// ì¸ë±ìŠ¤ ë²„í¼ ê°±ì‹ 
 	{
 		if ( FAILED( pDevice->CreateIndexBuffer( indicesSize, D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &m_pLightIndexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
@@ -151,7 +151,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 	D3DMATRIX curVm{};
 	pDevice->GetTransform( D3DTS_VIEW, &curVm );
 
-	// ºä Çà·ÄÀ» ±âº»À¸·Î ¹Ù²Û´Ù. °ÔÀÓ È­¸éÀº È®´ë¸¦ ÇÏ´Â °æ¿ì°¡ ÀÖ±â ¶§¹®
+	// ë·° í–‰ë ¬ì„ ê¸°ë³¸ìœ¼ë¡œ ë°”ê¾¼ë‹¤. ê²Œì„ í™”ë©´ì€ í™•ëŒ€ë¥¼ í•˜ëŠ” ê²½ìš°ê°€ ìˆê¸° ë•Œë¬¸
 	{
 		D3DXVECTOR3 eye{ x, y, 1 };
 		D3DXVECTOR3 at{ x, y, -1 };
@@ -163,7 +163,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		pDevice->SetTransform( D3DTS_VIEW, &view );
 	}
 
-	// ¸¶½ºÅ©¿¡ Á¶¸íÀ» ±×¸°´Ù
+	// ë§ˆìŠ¤í¬ì— ì¡°ëª…ì„ ê·¸ë¦°ë‹¤
 	if ( SUCCEEDED( pDevice->BeginScene() ) )
 	{
 		DWORD curBlendOp = {};
@@ -184,7 +184,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		pDevice->SetTexture( 0, m_pLightTexture );
 		pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
 		pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
-		// ¸¶½ºÅ©¸¦ µ¤¾î¾´´Ù
+		// ë§ˆìŠ¤í¬ë¥¼ ë®ì–´ì“´ë‹¤
 		// result = src * srcAlpha + dest * ( 1 - srcAlpha )
 		pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
@@ -221,7 +221,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 #endif
 	}
 
-	// ºä Çà·Ä º¹¿ø
+	// ë·° í–‰ë ¬ ë³µì›
 	pDevice->SetTransform( D3DTS_VIEW, &curVm );
 
 	return S_OK;
@@ -240,7 +240,7 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 		return E_FAIL;
 	}
 
-	// ±×¶óµ¥ÀÌ¼ÇÀ» ±×¸°´Ù
+	// ê·¸ë¼ë°ì´ì…˜ì„ ê·¸ë¦°ë‹¤
 	{
 		D3DLOCKED_RECT lockedRect = {};
 		pTexture->LockRect( 0, &lockedRect, NULL, D3DLOCK_READONLY );
@@ -265,7 +265,7 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 	}
 
 
-	// ¸Ş¸ğ¸®¿¡ ¾´ °ÍÀ» ´Ù½Ã ÀĞ¾îµéÀÎ´Ù. ÀÌ·¯¸é ·»´õ¸µ °¡´ÉÇÏ°Ô µÈ´Ù
+	// ë©”ëª¨ë¦¬ì— ì“´ ê²ƒì„ ë‹¤ì‹œ ì½ì–´ë“¤ì¸ë‹¤. ì´ëŸ¬ë©´ ë Œë”ë§ ê°€ëŠ¥í•˜ê²Œ ëœë‹¤
 	{
 		ID3DXBuffer* buffer = {};
 		if ( FAILED( D3DXSaveTextureToFileInMemory( &buffer, D3DXIFF_PNG, pTexture, NULL ) ) ) {
@@ -309,7 +309,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 	constexpr auto textureFVF = D3DFVF_XYZRHW | D3DFVF_DIFFUSE;
 	LPDIRECT3DVERTEXBUFFER9 pVertexBuffer = {};
 
-	// ¹öÅØ½º ¹öÆÛ Ã¤¿ì±â
+	// ë²„í…ìŠ¤ ë²„í¼ ì±„ìš°ê¸°
 	{
 		if ( FAILED( pDevice->CreateVertexBuffer( sizeof( customVertices ), 0, textureFVF, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
@@ -318,7 +318,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 
 		LPVOID pVertices = {};
 
-		if ( FAILED( pVertexBuffer->Lock( 0, sizeof( customVertices ), &static_cast<LPVOID>( pVertices ), 0 ) ) ) {
+		if ( FAILED( pVertexBuffer->Lock( 0, sizeof( customVertices ), &pVertices, 0 ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -329,7 +329,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 
 	LPDIRECT3DTEXTURE9 pTexture = {};
 
-	// ±×¸®±â
+	// ê·¸ë¦¬ê¸°
 	{
 		if ( FAILED( D3DXCreateTexture( pDevice, resolution, resolution, 0, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pTexture ) ) ) {
 			ASSERT( FALSE );
@@ -342,7 +342,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 		LPDIRECT3DSURFACE9 pTextureSurface = {};
 		pTexture->GetSurfaceLevel( 0, &pTextureSurface );
 
-		// ·»´õ¸µ ´ë»ó ¹Ù²Ş
+		// ë Œë”ë§ ëŒ€ìƒ ë°”ê¿ˆ
 		pDevice->SetRenderTarget( 0, pTextureSurface );
 		pDevice->Clear( 0, NULL, D3DCLEAR_TARGET, D3DCOLOR_XRGB( 0, 0, 255 ), 1.0f, 0 );
 
@@ -353,7 +353,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 			pDevice->EndScene();
 		}
 
-		// º¹±¸
+		// ë³µêµ¬
 		pDevice->SetRenderTarget( 0, currentRenderTarget );
 
 		SAFE_RELEASE( pTextureSurface );
@@ -403,7 +403,7 @@ HRESULT CFreeformLight::CreateMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutM
 		return E_FAIL;
 	}
 
-	// ¹öÅØ½º ¹öÆÛ Ã¤¿ì±â
+	// ë²„í…ìŠ¤ ë²„í¼ ì±„ìš°ê¸°
 	{
 		auto w = width / 2.f;
 		auto h = height / 2.f;
@@ -422,7 +422,7 @@ HRESULT CFreeformLight::CreateMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutM
 		pMesh->UnlockIndexBuffer();
 	}
 
-	// ÀÎµ¦½º ¹öÆÛ Ã¤¿ì±â
+	// ì¸ë±ìŠ¤ ë²„í¼ ì±„ìš°ê¸°
 	{
 		const WORD indices[] = {
 			0, 1, 2,
@@ -457,11 +457,11 @@ HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& se
 void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool& isVisible )
 {
 	if ( isVisible ) {
-		ImGui::Begin( u8"ÇÁ¸®Æû", &isVisible );
+		ImGui::Begin( u8"í”„ë¦¬í¼", &isVisible );
 
 		auto freeformLightVisible = IsVisible();
 
-		if ( ImGui::Button( freeformLightVisible ? u8"»èÁ¦" : u8"Ãß°¡" ) ) {
+		if ( ImGui::Button( freeformLightVisible ? u8"ì‚­ì œ" : u8"ì¶”ê°€" ) ) {
 			if ( freeformLightVisible ) {
 				RemoveLight();
 			}
@@ -472,12 +472,12 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 
 		if ( freeformLightVisible ) {
 			auto newSetting = GetSetting();
-			ImGui::ColorEdit3( u8"±×¸²ÀÚ", reinterpret_cast<float*>( &newSetting.shadowColor ) );
-			ImGui::ColorEdit3( u8"ºû", reinterpret_cast<float*>( &newSetting.lightColor ) );
-			ImGui::SliderFloat( u8"°­µµ", &newSetting.intensity, 0.f, 1.f );
-			ImGui::SliderFloat( u8"µå¸®¿ò", &newSetting.falloff, 0, 10 );
-			ImGui::Checkbox( u8"µµ¿ì¹Ì", &newSetting.helper );
-			ImGui::Checkbox( u8"¸¶½ºÅ©", &newSetting.maskOnly );
+			ImGui::ColorEdit3( u8"ê·¸ë¦¼ì", reinterpret_cast<float*>( &newSetting.shadowColor ) );
+			ImGui::ColorEdit3( u8"ë¹›", reinterpret_cast<float*>( &newSetting.lightColor ) );
+			ImGui::SliderFloat( u8"ê°•ë„", &newSetting.intensity, 0.f, 1.f );
+			ImGui::SliderFloat( u8"ë“œë¦¬ì›€", &newSetting.falloff, 0, 10 );
+			ImGui::Checkbox( u8"ë„ìš°ë¯¸", &newSetting.helper );
+			ImGui::Checkbox( u8"ë§ˆìŠ¤í¬", &newSetting.maskOnly );
 
 			SetSetting( pDevice, newSetting );
 		}
@@ -503,14 +503,14 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 			};
 			std::for_each( std::begin( coords ), std::end( coords ), projectToScreen );
 
-			// ÀÌµ¿ °¡´ÉÇÑ ´ÜÃß¸¦ ±×¸°´Ù. »ç½ÇÀº ºÎÀ¯ Ã¢. 
-			// Ã¹Â° Á¡Àº ¿øÁ¡ÀÌ¸ç, ¸¶Áö¸· Á¡Àº Ã¹¹øÂ° Á¤Á¡À¸·Î µ¹¾Æ¿À´Â Á¡ÀÌ¹Ç·Î ±×¸®Áö ¾Ê´Â´Ù
+			// ì´ë™ ê°€ëŠ¥í•œ ë‹¨ì¶”ë¥¼ ê·¸ë¦°ë‹¤. ì‚¬ì‹¤ì€ ë¶€ìœ  ì°½. 
+			// ì²«ì§¸ ì ì€ ì›ì ì´ë©°, ë§ˆì§€ë§‰ ì ì€ ì²«ë²ˆì§¸ ì •ì ìœ¼ë¡œ ëŒì•„ì˜¤ëŠ” ì ì´ë¯€ë¡œ ê·¸ë¦¬ì§€ ì•ŠëŠ”ë‹¤
 			for ( auto i = 0; i < coords.size(); ++i ) {
 				auto index = m_lightIndices[i];
 				auto& coord = coords[index];
 				auto name = std::to_string( i );
 
-				// ´ÜÃß ±×¸²
+				// ë‹¨ì¶” ê·¸ë¦¼
 				{
 					auto&& isEditing = m_vertexEditingStates[i];
 
@@ -527,21 +527,20 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 						
 						if ( p0 != p1 ) {
 							D3DXVECTOR3 out{};
-							D3DXVec3Unproject( &out, &D3DXVECTOR3{ nextPos.x, nextPos.y, 0.f }, &viewport, &projection, &view, &world );
+							D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
+							D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
 							out.z = {};
 
-							auto x = nextPos.x;
-							auto y = nextPos.y;
 							UpdateLightVertex( index, out );
 						}
 
-						ImGui::LabelText( ".", name.c_str() );
+						ImGui::LabelText( ".", "%s", name.c_str() );
 						ImGui::End();
 					}
 				}
 			}
 
-			// ¼±À» ±×¸°´Ù
+			// ì„ ì„ ê·¸ë¦°ë‹¤
 			{
 				auto drawList = ImGui::GetBackgroundDrawList();
 
@@ -556,7 +555,7 @@ void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG 
 
 					drawList->AddLine( from, to, ImColor{ 255,0,0 }, 2 );
 
-					// Á¤Á¡ Ãß°¡¸¦ À§ÇØ »ç¿ëÇÒ imgui ºê·£Ä¡ ¼³¸í
+					// ì •ì  ì¶”ê°€ë¥¼ ìœ„í•´ ì‚¬ìš©í•  imgui ë¸Œëœì¹˜ ì„¤ëª…
 					// https://github.com/ocornut/imgui/pull/1512
 				}
 			}
@@ -571,7 +570,7 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 			if ( updatingIndex == index ) {
 				m_lightVertices[index].position = position;
 
-				//// ÁßÁ¡ ¼öÁ¤
+				//// ì¤‘ì  ìˆ˜ì •
 				//{
 				//	auto area = 0.f;
 				//	auto centerX = 0.f;
@@ -608,14 +607,14 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 
 HRESULT CFreeformLight::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& setting )
 {
-	// ÅØ½ºÃ³ ¼öÁ¤
+	// í…ìŠ¤ì²˜ ìˆ˜ì •
 	if ( m_pLightTexture && ( m_setting.lightColor != setting.lightColor || m_setting.intensity != setting.intensity ) ) {
 		SAFE_RELEASE( m_pLightTexture );
 
 		CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting );
 	}
 
-	// uv ¼öÁ¤
+	// uv ìˆ˜ì •
 	if ( m_setting.falloff != setting.falloff ) {
 		auto falloff = setting.falloff;
 
