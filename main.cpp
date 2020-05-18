@@ -335,7 +335,6 @@ VOID Render()
 		}
 
 		// 프리폼 조명
-		if ( g_pFreemformLight->IsVisible() ) 
 		{
 			LPDIRECT3DSURFACE9 pScreenSurface{};
 			g_pScreenTexture->GetSurfaceLevel( 0, &pScreenSurface );
@@ -345,12 +344,15 @@ VOID Render()
 			LPDIRECT3DSURFACE9 curRT = {};
 			g_pd3dDevice->GetRenderTarget( 0, &curRT );
 			g_pd3dDevice->SetRenderTarget( 0, pScreenSurface );
-			g_pd3dDevice->Clear( 0, 0, D3DCLEAR_TARGET, clearColor, 0.0f, 0 );
+			g_pd3dDevice->Clear( 0, 0, D3DCLEAR_TARGET, clearColor, 1.0f, 0 );
 
-			g_pFreemformLight->Draw( g_pd3dDevice, pScreenSurface, x, y );
+			if ( g_pFreemformLight->IsVisible() )
+			{
+				g_pFreemformLight->Draw( g_pd3dDevice, pScreenSurface, x, y );
+			}
+
+			SAFE_RELEASE( pScreenSurface );
 		}
-
-		SAFE_RELEASE( pMainScreenSurface );
 	}
 
 	g_pd3dDevice->SetRenderTarget( 0, pCurrentSurface );
@@ -384,7 +386,6 @@ VOID Render()
 		}
 
 		// 마스크 그리기
-		if ( g_pFreemformLight->IsVisible() )
 		{
 			D3DXMATRIX curWm = {};
 			g_pd3dDevice->GetTransform( D3DTS_WORLD, &curWm );
@@ -554,7 +555,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				// Create ImGui widget
 				auto xCenter = gDisplayMode.Width / 2;
 				auto yCenter = gDisplayMode.Height / 2;
-				g_pFreemformLight->CreateImgui( g_pd3dDevice, xCenter, yCenter, showWindow );
+				g_pFreemformLight->CreateImgui( g_pd3dDevice, xCenter, yCenter, true, &showWindow );
 
 				//ImGui::ShowDemoWindow();
 
