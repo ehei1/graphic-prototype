@@ -8,8 +8,9 @@ build job:
     tags:
         - windows
     script:
-        - echo "hi"
-
+        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
+        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Release
+        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Profile
 
 test job:
     script:
