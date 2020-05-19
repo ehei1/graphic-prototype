@@ -1,3 +1,20 @@
-job1:
+stages:
+    - build
+    - test
+    - deploy
+
+build job:
+    stage: build
+    tags:
+        - windows
     script:
-        - echo 'test'
+        - echo "hi"
+
+
+test job:
+    script:
+        - echo "test coming soon"
+        
+deploy job:
+    script:
+        - echo "deploy coming soon"
