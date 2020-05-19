@@ -1,6 +1,3 @@
-.build:
-    deploy:
-        - windows-runner
+job1:
     script:
         - echo 'test'
-        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
