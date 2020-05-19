@@ -9,7 +9,7 @@ build job:
     tags:
         - ehei
     script:
-        - "%ProgramFiles(x86)%\Microsoft Visual Studio 14.0\Common7\Tools\vsvars32.bat"
+        - "%ProgramFiles(x86)%\\Microsoft Visual Studio 14.0\\Common7\\Tools\\vsvars32.bat"
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Release
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Profile
