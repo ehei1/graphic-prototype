@@ -6,7 +6,7 @@ stages:
 build job:
     stage: build
     tags:
-        - windows
+        - ehei
     script:
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Release
