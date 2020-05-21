@@ -5,7 +5,8 @@
 #include <unordered_set>
 #include "FreeformLight.h"
 
-//#define DEBUG_FREEFORM
+//#define DEBUG_LINE
+//#define DEBUG_SURFACE
 
 
 void CFreeformLight::InvalidateDeviceObjects()
@@ -145,7 +146,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
 
-#ifdef DEBUG_FREEFORM
+#ifdef DEBUG_SURFACE
 		D3DSURFACE_DESC surfaceDesc{};
 
 		if ( SUCCEEDED( pSurface->GetDesc( &surfaceDesc ) ) ) {
@@ -226,7 +227,7 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 		}
 	}
 
-#ifdef DEBUG_FREEFORM
+#ifdef DEBUG_SURFACE
 	D3DXSaveTextureToFile( TEXT( "D:\\lightTex.png" ), D3DXIFF_PNG, pTexture, NULL );
 #endif
 
@@ -304,7 +305,7 @@ HRESULT CFreeformLight::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice,
 		SAFE_RELEASE( pTextureSurface );
 		SAFE_RELEASE( currentRenderTarget );
 
-#ifdef DEBUG_FREEFORM
+#ifdef DEBUG_SURFACE
 		if ( FAILED( D3DXSaveTextureToFile( TEXT( "D:\\lightTex.png" ), D3DXIFF_PNG, pTexture, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
@@ -399,155 +400,223 @@ HRESULT CFreeformLight::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting& se
 	return S_OK;
 }
 
-void CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool isAmbientMode, bool* pIsVisible )
+HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LONG yCenter, bool isAmbientMode, bool* pIsVisible )
 {
 	ASSERT( pIsVisible );
 
-	if ( *pIsVisible ) {
-		ImGui::Begin( u8"조명", pIsVisible );
+	if ( !*pIsVisible ) {
+		return S_OK;
+	}
 
-		auto newSetting = GetSetting();
+	ImGui::Begin( u8"조명", pIsVisible );
 
-		if ( isAmbientMode ) {
-			ImGui::ColorEdit3( u8"주변", reinterpret_cast<float*>( &newSetting.shadowColor ) );
-		} else {
-			ImGui::TextWrapped(  u8"주변 색을 바꾸려면 Ambient 플래그를 켜세요" );
+	auto pointButtonStyle = ImGuiWindowFlags_NoDecoration - ImGuiWindowFlags_NoTitleBar;
+	auto newSetting = GetSetting();
+
+	if ( isAmbientMode ) {
+		ImGui::ColorEdit3( u8"주변", reinterpret_cast<float*>( &newSetting.shadowColor ) );
+	} else {
+		ImGui::TextWrapped(  u8"주변 색을 바꾸려면 Ambient 플래그를 켜세요" );
+	}
+
+	auto freeformLightVisible = IsVisible();
+
+	if ( ImGui::CollapsingHeader( u8"프리폼" ) ) {
+		if ( ImGui::IsItemHovered() ) {
+			ImGui::BeginTooltip();
+			ImGui::TextUnformatted( u8"메시로 만들어진 조명 마스크를 동적으로 편집" );
+			ImGui::EndTooltip();
 		}
 
-		auto freeformLightVisible = IsVisible();
-
-		if ( ImGui::CollapsingHeader( u8"프리폼" ) ) {
-			if ( ImGui::IsItemHovered() ) {
-				ImGui::BeginTooltip();
-				ImGui::TextUnformatted( u8"메시로 만들어진 조명 마스크를 동적으로 편집" );
-				ImGui::EndTooltip();
-			}
-
-			if ( ImGui::Button( freeformLightVisible ? u8"숨기기" : u8"보이기" ) ) {
-				if ( freeformLightVisible ) {
-					RemoveLight();
-				}
-				else {
-					AddLight( pDevice, xCenter, yCenter );
-				}
-			}
-
+		if ( ImGui::Button( freeformLightVisible ? u8"숨기기" : u8"보이기" ) ) {
 			if ( freeformLightVisible ) {
-				ImGui::ColorEdit3( u8"빛", reinterpret_cast<float*>( &newSetting.lightColor ) );
-				ImGui::SliderFloat( u8"강도", &newSetting.intensity, 0.f, 1.f );
-				ImGui::SliderFloat( u8"드리움", &newSetting.falloff, 0, 10 );
-				ImGui::Checkbox( u8"도우미", &newSetting.helper );
-				ImGui::Checkbox( u8"마스크", &newSetting.maskOnly );
+				RemoveLight();
+			}
+			else {
+				AddLight( pDevice, xCenter, yCenter );
 			}
 		}
 
-		SetSetting( pDevice, newSetting );
+		if ( freeformLightVisible ) {
+			ImGui::ColorEdit3( u8"빛", reinterpret_cast<float*>( &newSetting.lightColor ) );
+			ImGui::SliderFloat( u8"강도", &newSetting.intensity, 0.f, 1.f );
+			ImGui::SliderFloat( u8"드리움", &newSetting.falloff, 0, 10 );
+			ImGui::Checkbox( u8"도우미", &newSetting.helper );
+			ImGui::Checkbox( u8"마스크", &newSetting.maskOnly );
+		}
+	}
 
-		ImGui::End();
+	SetSetting( pDevice, newSetting );
 
-		if ( freeformLightVisible && m_setting.helper ) {
-			D3DXMATRIX world{};
-			pDevice->GetTransform( D3DTS_WORLD, &world );
-			D3DXMATRIX view{};
-			pDevice->GetTransform( D3DTS_VIEW, &view );
-			D3DXMATRIX projection{};
-			pDevice->GetTransform( D3DTS_PROJECTION, &projection );
-			D3DVIEWPORT9 viewport{};
-			pDevice->GetViewport( &viewport );
+	ImGui::End();
 
-			Points points;
+	if ( freeformLightVisible && m_setting.helper ) {
+		D3DXMATRIX world{};
+		pDevice->GetTransform( D3DTS_WORLD, &world );
+		D3DXMATRIX view{};
+		pDevice->GetTransform( D3DTS_VIEW, &view );
+		D3DXMATRIX projection{};
+		pDevice->GetTransform( D3DTS_PROJECTION, &projection );
+		D3DVIEWPORT9 viewport{};
+		pDevice->GetViewport( &viewport );
 
-			auto projectToScreen = [&world, &view, &projection, &viewport]( const CUSTOM_VERTEX& vertex ) {
-				D3DXVECTOR3 position{};
-				D3DXVec3Project( &position, &vertex.position, &viewport, &projection, &view, &world );
+		auto projectToScreen = [&world, &view, &projection, &viewport]( const CUSTOM_VERTEX& vertex ) {
+			D3DXVECTOR3 position{};
+			D3DXVec3Project( &position, &vertex.position, &viewport, &projection, &view, &world );
 
-				return position;
-			};
-			std::transform( std::begin( m_lightVertices ), std::end( m_lightVertices ), std::back_inserter( points ), projectToScreen );
+			return position;
+		};
+		Points projectedPoints;
+		std::transform( std::begin( m_lightVertices ), std::end( m_lightVertices ), std::back_inserter( projectedPoints ), projectToScreen );
 
-			// 이동 가능한 단추를 그린다. 사실은 부유 창. 
-			// 첫째 점은 원점이며, 마지막 점은 첫번째 정점으로 돌아오는 점이므로 그리지 않는다
-			for ( auto i = 1; i < points.size(); ++i ) {
-				auto index = m_lightIndices[i];
-				auto& point = points[index];
-				auto name = std::to_string( i );
+		auto controlOffset = 20.f;
 
-				// 단추 그림
-				// 부유 가능한 창을 만들고 이동 불가능하게 한다. 창이 선택되면 이동 가능한 상태로 한다. 그렇지 않으면 실수 오차로 인해 조금씩 움직일 수 있다
-				{
-					auto&& isEditing = m_vertexEditingStates[i];
-					ImGui::SetNextWindowPos( { point.x, point.y }, isEditing ? ImGuiCond_Once : ImGuiCond_Always );
-					ImGui::SetNextWindowSize( { 5, 5 }, ImGuiCond_Always );
+		// 이동 가능한 단추를 그린다. 사실은 부유 창. 
+		// 첫째 점은 원점이며, 마지막 점은 첫번째 정점으로 돌아오는 점이므로 그리지 않는다
+		for ( auto i = 1; i < projectedPoints.size(); ++i ) {
+			auto index = m_lightIndices[i];
+			auto& projectedPoint = projectedPoints[index];
+			auto name = std::to_string( i );
 
-					auto pointClosed = true;
-					auto hasMoreVertexThanTriangle = ( m_lightVertices.size() - 1 ) > 3;
-					// 원점 삭제 불가능
-					auto noPointDeleted = i && hasMoreVertexThanTriangle ? &pointClosed : nullptr;
+			// 단추 그림
+			// 부유 가능한 창을 만들고 이동 불가능하게 한다. 창이 선택되면 이동 가능한 상태로 한다. 그렇지 않으면 실수 오차로 인해 조금씩 움직일 수 있다
+			{
+				auto&& isEditing = m_vertexEditingStates[i];
+				ImGui::SetNextWindowPos( { projectedPoint.x, projectedPoint.y }, isEditing ? ImGuiCond_Once : ImGuiCond_Always );
+				ImGui::SetNextWindowSize( { 5, 5 }, ImGuiCond_Always );
 
-					if ( ImGui::Begin( name.c_str(), noPointDeleted, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse ) ) {
-						isEditing = ImGui::IsItemActive();
-						auto nextPos = ImGui::GetWindowPos();
+				auto pointClosed = true;
+				auto hasMoreVertexThanTriangle = ( m_lightVertices.size() - 1 ) > 3;
+				// 원점 삭제 불가능
+				auto noPointDeleted = i && hasMoreVertexThanTriangle ? &pointClosed : nullptr;
 
-						using Position = std::pair<int, int>;
-						Position p0{ static_cast<int>( point.x ), static_cast<int>( point.y ) };
-						Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
+				if ( ImGui::Begin( name.c_str(), noPointDeleted, pointButtonStyle ) ) {
+					isEditing = ImGui::IsItemActive();
+					auto nextPos = ImGui::GetWindowPos();
+
+					using Position = std::pair<int, int>;
+					Position p0{ static_cast<int>( projectedPoint.x ), static_cast<int>( projectedPoint.y ) };
+					Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
 						
-						if ( p0 != p1 ) {
-							D3DXVECTOR3 out{};
-							D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
-							D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
-							out.z = {};
+					if ( p0 != p1 ) {
+						D3DXVECTOR3 out{};
+						D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
+						D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
+						out.z = {};
 
-							UpdateLightVertex( index, out );
-						}
-
-						ImGui::Text( "%s", name.c_str() );
-						ImGui::End();
+						UpdateLightVertex( index, out );
 					}
 
-					// 정점 삭제
-					if ( noPointDeleted && ! *noPointDeleted) {
-						auto iterator = std::cbegin( points );
-						std::advance( iterator, i );
-						ASSERT( iterator != std::cend( points ) );
-						points.erase( iterator );
-						ASSERT( !points.empty() );
+					ImGui::Text( "%s", name.c_str() );
+					ImGui::End();
+				}
 
-						points[0] = GetCenterPoint( points );
+				// 정점 삭제
+				if ( noPointDeleted && ! *noPointDeleted ) {
+					if ( FAILED( RemoveLightVertex( pDevice, i ) ) ) {
+						ASSERT( FALSE );
 
-						if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, m_setting.falloff ) ) ) {
-							ASSERT( FALSE );
-						}
-						else if ( FAILED( UpdateLightIndexBuffer( &m_pLightIndexBuffer, m_lightIndices, pDevice, points.size() ) ) ) {
-							ASSERT( FALSE );
-						}
-						
-						return;
+						return E_FAIL;
 					}
+						
+					return S_OK;
 				}
 			}
+		}
 
-			// 선을 그린다
-			{
-				auto drawList = ImGui::GetBackgroundDrawList();
+		// 선을 그린다
+		{
+			auto drawList = ImGui::GetBackgroundDrawList();
 
-				for ( auto i = 2; i < m_lightIndices.size(); ++i ) {
-					auto index0 = m_lightIndices[i - 1];
-					auto index1 = m_lightIndices[i];
-					auto& coord0 = points[index0];
-					auto& coord1 = points[index1];
+			for ( auto lightIndex = 2; lightIndex < m_lightIndices.size(); ++lightIndex ) {
+				auto i0 = m_lightIndices[lightIndex - 1];
+				auto i1 = m_lightIndices[lightIndex];
+				auto& from = projectedPoints[i0];
+				auto& to = projectedPoints[i1];
 
-					ImVec2 from{ coord0.x, coord0.y };
-					ImVec2 to{ coord1.x, coord1.y };
+				drawList->AddLine( { from.x, from.y }, { to.x, to.y }, IM_COL32_WHITE, 2 );
 
-					drawList->AddLine( from, to, ImColor{ 255,0,0 }, 2 );
+				// 선 주위에 직사각형을 그린다. 이것은 마우스 커서 위치 판정에 쓰인다
+				{
+					auto width = 10.f;
+					auto direction = to - from;
+					auto offset = 5.f;
+					auto height = D3DXVec3Length( &direction ) - offset;
+					D3DXVec3Normalize( &direction, &direction );
 
-					// 정점 추가를 위해 사용할 imgui 브랜치 설명
-					// https://github.com/ocornut/imgui/pull/1512
+					D3DXMATRIX rm{};
+					D3DXMatrixRotationZ( &rm, D3DXToRadian( 90 ) );
+
+					auto radian = D3DXToRadian( 90 );
+					auto _x = direction.x * cos( radian ) - direction.y * sin( radian );
+					auto _y = direction.x * sin( radian ) + direction.y * cos( radian );
+
+					D3DXVECTOR4 rotatedDirection{};
+					D3DXVec3Transform( &rotatedDirection, &direction, &rm );
+
+					auto yBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y, {} } *width;
+					auto p0 = from + yBias;
+					auto p1 = from - yBias;
+					auto xBias = D3DXVECTOR3{ direction.x, direction.y, {} } *height;
+					auto p2 = p1 + xBias;
+					auto p3 = p0 + xBias;
+
+					Points lines = { p0, p1, p2, p3 };
+
+					// check area
+					auto mousePos = ImGui::GetMousePos();
+
+					if ( IsInsidePolygon( lines, { mousePos.x, mousePos.y, {} } ) ) {
+						D3DXVECTOR3 crossPoint{};
+						if ( GetCrossPoint( crossPoint, from, to, mousePos.x ) ) {
+#ifdef DEBUG_LINE
+							drawList->AddCircle( { crossPoint.x, crossPoint.y }, 5, IM_COL32( 0, 255, 0, 255 ) );
+#endif
+							ImGui::SetNextWindowPos( { crossPoint.x - controlOffset, crossPoint.y - controlOffset } );
+							ImGui::Begin( ".", nullptr, ImGuiWindowFlags_NoDecoration );
+							auto pushed = ImGui::Button( "o" );
+							ImGui::End();
+
+							if ( pushed ) {
+								D3DXVec3Unproject( &crossPoint, &crossPoint, &viewport, &projection, &view, &world );
+								AddLightVertex( pDevice, lightIndex, crossPoint );
+								return S_OK;
+							}
+						}
+					}
+
+#ifdef DEBUG_LINE
+					// draw direction
+					{
+						auto _xCenter = static_cast<float>( xCenter );
+						auto _yCenter = static_cast<float>( yCenter );
+						auto debugColor = IM_COL32( 0, 255, 0, 255 );
+
+						// draw direction
+						drawList->AddLine( { _xCenter, _yCenter }, { direction.x * 100 + _xCenter, direction.y * 100 + _yCenter }, debugColor, 1 );
+						drawList->AddLine( { _xCenter, _yCenter }, { rotatedDirection.x * 100 + _xCenter, rotatedDirection.y * 100 + _yCenter }, debugColor, 1 );
+					}
+
+					// draw area
+					{
+						auto debugColor = IM_COL32( 0, 255, 0, 255 );
+						auto thickness = 1;
+
+						for ( auto pointIndex = 0; pointIndex < lines.size(); ++pointIndex ) {
+							auto& p0 = lines[pointIndex];
+							auto nextIndex = ( pointIndex + 1 ) % lines.size();
+							auto& p1 = lines[nextIndex];
+
+							drawList->AddLine( { p0.x, p0.y }, { p1.x, p1.y }, debugColor, thickness );
+						}
+					}
+#endif
 				}
 			}
 		}
 	}
+
+	return S_OK;
 }
 
 HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3& position )
@@ -678,7 +747,7 @@ HRESULT CFreeformLight::UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, 
 	std::transform( std::cbegin( points ), std::cend( points ), std::back_inserter( vertices ), updateVertex );
 	vertices[0].uv = { falloff, falloff };
 
-#ifdef DEBUG_FREEFORM
+#ifdef DEBUG_LINE
 	auto debugPosition = []( const CUSTOM_VERTEX& vertex ) {
 		auto& position = vertex.position;
 		TCHAR debugText[MAX_PATH] = {};
@@ -716,7 +785,6 @@ D3DXVECTOR3 CFreeformLight::GetCenterPoint( const Points& points ) const
 	auto getNDivedPoint = []( const D3DXVECTOR3& p0, const D3DXVECTOR3& p1, int i ) -> D3DXVECTOR3 {
 		return p0 + ( p1 - p0 ) / i;
 	};
-
 	auto center = getMidPoint( points[0], points[1] );
 
 	for ( auto i = 2; i < points.size(); ++i ) {
@@ -724,4 +792,127 @@ D3DXVECTOR3 CFreeformLight::GetCenterPoint( const Points& points ) const
 	}
 
 	return center;
+}
+
+// https://bowbowbow.tistory.com/24
+BOOL CFreeformLight::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR3& point ) const
+{	
+	//crosses는 점q와 오른쪽 반직선과 다각형과의 교점의 개수
+	auto crosses = 0;
+	auto y = point.y;
+
+	for ( auto index = 0; index < linePoints.size(); ++index ) {
+		auto nextIndex = ( index + 1 ) % linePoints.size();
+		auto& p0 = linePoints[index];
+		auto& p1 = linePoints[nextIndex];
+
+		//점 B가 선분 (p[i], p[j])의 y좌표 사이에 있음
+		if ( ( p0.y > point.y ) != ( p1.y > point.y ) ) {
+			//atX는 점 B를 지나는 수평선과 선분 (p[i], p[j])의 교점
+			//auto at = ( p1.x - p0.x )*( point.y - p0.y ) / ( p1.y - p0.y ) + p0.x;
+			auto at = ( p1.x - p0.x ) * ( y - p0.y ) / ( p1.y - p0.y ) + p0.x;
+
+			//atX가 오른쪽 반직선과의 교점이 맞으면 교점의 개수를 증가시킨다.
+			if ( point.x < at ) {
+				++crosses;
+			}
+		}
+	}
+
+	return crosses % 2 > 0;
+}
+
+// https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
+BOOL CFreeformLight::GetCrossPoint( D3DXVECTOR3& out, const D3DXVECTOR3& a, const D3DXVECTOR3& b, float x ) const
+{
+	D3DXVECTOR3 c = { x, {}, {} };
+	D3DXVECTOR3 d = { x, 10000, {} };
+
+	auto a1 = b.y - a.y;
+	auto b1 = a.x - b.x;
+	auto c1 = a1 * a.x + b1 * a.y;
+
+	auto a2 = d.y - c.y;
+	auto b2 = c.x - d.x;
+	auto c2 = a2 * c.x + b2 * c.y;
+
+	if ( auto determinant = a1 * b2 - a2 * b1 ) {
+		auto cx = ( b2*c1 - b1*c2 ) / determinant;
+		auto cy = ( a1*c2 - a2*c1 ) / determinant;
+
+		out = { cx, cy, {} };
+		return TRUE;
+	}
+	else {
+		out = {};
+		return FALSE;
+	}
+}
+
+HRESULT CFreeformLight::AddLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD index, const D3DXVECTOR3& position )
+{
+	if ( m_lightVertices.size() < index ) {
+		ASSERT( FALSE );
+
+		return E_FAIL;
+	}
+
+	auto points = GetPointsFromVertices( m_lightVertices );
+	auto iterator = std::next( std::cbegin( points ), index );
+	points.insert( iterator, position );
+
+	if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, m_setting.falloff ) ) ) {
+		ASSERT( FALSE );
+
+		return E_FAIL;
+	}
+	else if ( FAILED( UpdateLightIndexBuffer( &m_pLightIndexBuffer, m_lightIndices, pDevice, points.size() ) ) ) {
+		ASSERT( FALSE );
+
+		return E_FAIL;
+	}
+
+	ClearEditingStates( m_lightVertices.size() );
+	return S_OK;
+}
+
+HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD index )
+{
+	auto points = GetPointsFromVertices( m_lightVertices );
+	auto iterator = std::next( std::cbegin( points ), index );
+	ASSERT( iterator != std::cend( points ) );
+	points.erase( iterator );
+	ASSERT( !points.empty() );
+
+	points[0] = GetCenterPoint( points );
+
+	if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, m_setting.falloff ) ) ) {
+		ASSERT( FALSE );
+
+		return E_FAIL;
+	}
+	else if ( FAILED( UpdateLightIndexBuffer( &m_pLightIndexBuffer, m_lightIndices, pDevice, points.size() ) ) ) {
+		ASSERT( FALSE );
+
+		return E_FAIL;
+	}
+
+	ClearEditingStates( m_lightVertices.size() );
+	return S_OK;
+}
+
+CFreeformLight::Points CFreeformLight::GetPointsFromVertices( const Vertices& ) const
+{
+	Points points;
+	auto addPoint = []( const CUSTOM_VERTEX& vertex ) { return vertex.position; };
+	std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), addPoint );
+	ASSERT( points.size() == m_lightVertices.size() );
+
+	return points;
+}
+
+void CFreeformLight::ClearEditingStates( size_t vertexCount )
+{
+	m_vertexEditingStates.clear();
+	m_vertexEditingStates.resize( vertexCount );
 }

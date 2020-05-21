@@ -38,7 +38,7 @@ public:
 	inline bool IsVisible() const { return !!m_pLightVertexBuffer; }
 
 	// 개발 용도의 imgui 창을 만든다
-	void CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool isAmbientMode, bool* pIsVisible );
+	HRESULT CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool isAmbientMode, bool* pIsVisible );
 	inline const Setting& GetSetting() const { return m_setting; }
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
 
@@ -62,15 +62,25 @@ private:
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
 	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
+	HRESULT AddLightVertex( LPDIRECT3DDEVICE9, WORD index, const D3DXVECTOR3& position );
+	HRESULT RemoveLightVertex( LPDIRECT3DDEVICE9, WORD index );
+
 	HRESULT CopyToMemory( LPDIRECT3DVERTEXBUFFER9 pDest, LPVOID pSrc, size_t size ) const;
 	HRESULT UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, Vertices& vertices, LPDIRECT3DDEVICE9 pDevice, const Points& points, float falloff );
 	// 인덱스 버퍼를 갱신한다
 	HRESULT UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, Indices& indices, LPDIRECT3DDEVICE9, size_t vertexSize ) const;
 	// 중점을 얻는다
 	D3DXVECTOR3 GetCenterPoint( const Points& ) const;
+	BOOL IsInsidePolygon( const Points&, const D3DXVECTOR3& point ) const;
+	/*
+	주어진 두 선과의 y 축 간의 교점을 얻는다
+	*/
+	BOOL GetCrossPoint( D3DXVECTOR3& out, const D3DXVECTOR3& p0, const D3DXVECTOR3& p1, float x ) const;
+
+	Points GetPointsFromVertices( const Vertices& ) const;
+	void ClearEditingStates( size_t vertexCount );
 
 private:
-
 	// 개별 프리폼 조명 정보
 	// 텍스처
 	LPDIRECT3DTEXTURE9 m_pLightTexture{};

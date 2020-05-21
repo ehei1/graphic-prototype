@@ -348,7 +348,7 @@ VOID Render()
 
 			if ( g_pFreemformLight->IsVisible() )
 			{
-				g_pFreemformLight->Draw( g_pd3dDevice, pScreenSurface, x, y );
+				g_pFreemformLight->Draw( g_pd3dDevice, pScreenSurface, x + gTranslation.x, y + gTranslation.y );
 			}
 
 			SAFE_RELEASE( pScreenSurface );
