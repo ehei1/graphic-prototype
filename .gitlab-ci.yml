@@ -19,6 +19,8 @@ build job:
               }
             }
         - popd
+        - git submodule init
+        - git submodule update
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Release
         - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Profile
