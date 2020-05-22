@@ -9,6 +9,11 @@
 //#define DEBUG_SURFACE
 
 
+CFreeformLight::CFreeformLight()
+{
+	D3DXMatrixRotationZ( &m_rotationMatrix, D3DXToRadian( 90 ) );
+}
+
 void CFreeformLight::InvalidateDeviceObjects()
 {
 	SAFE_RELEASE( m_pLightTexture );
@@ -43,7 +48,7 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 		ASSERT( m_pLightTexture );
 	}
 
-	Points points{ { {}, {}, {} } };
+	Points points{ { {},{},{} } };
 	// 화면의 절반만 차지하도록 한다
 	auto scaledWidth = m_displayMode.Width / 4;
 	auto scaledHeight = m_displayMode.Height / 4;
@@ -53,8 +58,8 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 		points.insert( points.end(), vertices.begin(), vertices.end() );
 	}
 
-	auto changeToWorldCoord = [center = D3DXVECTOR3{ static_cast<float>( x ), static_cast<float>( y ),{} }, scaledWidth, scaledHeight ]( D3DXVECTOR3& point ) {
-		point = D3DXVECTOR3{ point.x * scaledWidth, point.y * scaledHeight, {} } + center;
+	auto changeToWorldCoord = [center = D3DXVECTOR3{ static_cast<float>( x ), static_cast<float>( y ),{} }, scaledWidth, scaledHeight]( D3DXVECTOR3& point ) {
+		point = D3DXVECTOR3{ point.x * scaledWidth, point.y * scaledHeight,{} } +center;
 	};
 	std::for_each( std::begin( points ), std::end( points ), changeToWorldCoord );
 
@@ -89,6 +94,8 @@ HRESULT CFreeformLight::RemoveLight()
 
 HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSurface, float x, float y )
 {
+	_CRT_UNUSED( pSurface );
+
 	if ( !m_pLightVertexBuffer )
 	{
 		return S_OK;
@@ -137,7 +144,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
 		pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, sizeof( Vertices::value_type ) );
 		pDevice->SetIndices( m_pLightIndexBuffer );
-		pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, m_lightVertices.size(), 0, primitiveCount );
+		pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, static_cast<UINT>( m_lightVertices.size() ), 0, static_cast<UINT>( primitiveCount ) );
 		pDevice->EndScene();
 
 		pDevice->SetFVF( curFVF );
@@ -415,8 +422,9 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 
 	if ( isAmbientMode ) {
 		ImGui::ColorEdit3( u8"주변", reinterpret_cast<float*>( &newSetting.shadowColor ) );
-	} else {
-		ImGui::TextWrapped(  u8"주변 색을 바꾸려면 Ambient 플래그를 켜세요" );
+	}
+	else {
+		ImGui::TextWrapped( u8"주변 색을 바꾸려면 Ambient 플래그를 켜세요" );
 	}
 
 	auto freeformLightVisible = IsVisible();
@@ -463,6 +471,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 		auto projectToScreen = [&world, &view, &projection, &viewport]( const CUSTOM_VERTEX& vertex ) {
 			D3DXVECTOR3 position{};
 			D3DXVec3Project( &position, &vertex.position, &viewport, &projection, &view, &world );
+			position.z = {};
 
 			return position;
 		};
@@ -494,10 +503,10 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 					isEditing = ImGui::IsItemActive();
 					auto nextPos = ImGui::GetWindowPos();
 
-					using Position = std::pair<int, int>;
-					Position p0{ static_cast<int>( projectedPoint.x ), static_cast<int>( projectedPoint.y ) };
-					Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
-						
+					using _Position = std::pair<int, int>;
+					_Position p0{ static_cast<int>( projectedPoint.x ), static_cast<int>( projectedPoint.y ) };
+					_Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
+
 					if ( p0 != p1 ) {
 						D3DXVECTOR3 out{};
 						D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
@@ -512,13 +521,13 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 				}
 
 				// 정점 삭제
-				if ( noPointDeleted && ! *noPointDeleted ) {
+				if ( noPointDeleted && !*noPointDeleted ) {
 					if ( FAILED( RemoveLightVertex( pDevice, i ) ) ) {
 						ASSERT( FALSE );
 
 						return E_FAIL;
 					}
-						
+
 					return S_OK;
 				}
 			}
@@ -527,6 +536,8 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 		// 선을 그린다
 		{
 			auto drawList = ImGui::GetBackgroundDrawList();
+			auto hasNoCrossPoint = true;
+			auto isNoEditing = std::none_of( std::cbegin( m_vertexEditingStates ), std::cend( m_vertexEditingStates ), []( bool v ) { return v == true; } );
 
 			for ( auto lightIndex = 2; lightIndex < m_lightIndices.size(); ++lightIndex ) {
 				auto i0 = m_lightIndices[lightIndex - 1];
@@ -537,40 +548,54 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 				drawList->AddLine( { from.x, from.y }, { to.x, to.y }, IM_COL32_WHITE, 2 );
 
 				// 선 주위에 직사각형을 그린다. 이것은 마우스 커서 위치 판정에 쓰인다
+				if ( isNoEditing && hasNoCrossPoint )
 				{
-					auto width = 10.f;
-					auto direction = to - from;
-					auto offset = 5.f;
-					auto height = D3DXVec3Length( &direction ) - offset;
-					D3DXVec3Normalize( &direction, &direction );
+					const PointCacheKey cacheKey{ i0, i1 };
+					auto iterator = m_linePointsCaches.find( cacheKey );
+					Points linePoints;
+					D3DXVECTOR3 _from;
+					D3DXVECTOR3 _to;
 
-					D3DXMATRIX rm{};
-					D3DXMatrixRotationZ( &rm, D3DXToRadian( 90 ) );
+					if ( iterator == std::cend( m_linePointsCaches ) ) {
+						auto direction = to - from;
+						D3DXVec3Normalize( &direction, &direction );
 
-					auto radian = D3DXToRadian( 90 );
-					auto _x = direction.x * cos( radian ) - direction.y * sin( radian );
-					auto _y = direction.x * sin( radian ) + direction.y * cos( radian );
+						D3DXVECTOR4 rotatedDirection{};
+						D3DXVec3Transform( &rotatedDirection, &direction, &m_rotationMatrix );
 
-					D3DXVECTOR4 rotatedDirection{};
-					D3DXVec3Transform( &rotatedDirection, &direction, &rm );
+						auto offset = 20.f;
+						auto directionOffset = direction * offset;
+						_from = from + directionOffset;
+						_to = to - directionOffset;
 
-					auto yBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y, {} } *width;
-					auto p0 = from + yBias;
-					auto p1 = from - yBias;
-					auto xBias = D3DXVECTOR3{ direction.x, direction.y, {} } *height;
-					auto p2 = p1 + xBias;
-					auto p3 = p0 + xBias;
+						auto width = 10.f;
+						auto xBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y,{} } * width;
+						auto p0 = _from + xBias;
+						auto p1 = _from - xBias;
+						auto p2 = _to - xBias;
+						auto p3 = _to + xBias;
 
-					Points lines = { p0, p1, p2, p3 };
+						linePoints = { p0, p1, p2, p3 };
+						m_linePointsCaches.insert( { cacheKey, Cache{ linePoints, _from, _to } } );
+					}
+					else {
+						auto& cache = iterator->second;
+						linePoints = cache.m_points;
+						_from = cache.m_from;
+						_to = cache.m_to;
+					}
 
 					// check area
 					auto mousePos = ImGui::GetMousePos();
 
-					if ( IsInsidePolygon( lines, { mousePos.x, mousePos.y, {} } ) ) {
+					if ( IsInsidePolygon( linePoints, { mousePos.x, mousePos.y,{} } ) ) {
+						hasNoCrossPoint = false;
+
 						D3DXVECTOR3 crossPoint{};
-						if ( GetCrossPoint( crossPoint, from, to, mousePos.x ) ) {
+
+						if ( GetCrossPoint( crossPoint, _from, _to, { mousePos.x, mousePos.y } ) ) {
 #ifdef DEBUG_LINE
-							drawList->AddCircle( { crossPoint.x, crossPoint.y }, 5, IM_COL32( 0, 255, 0, 255 ) );
+							drawList->AddCircle( { crossPoint.x, crossPoint.y }, 50, IM_COL32( 0, 255, 0, 255 ) );
 #endif
 							ImGui::SetNextWindowPos( { crossPoint.x - controlOffset, crossPoint.y - controlOffset } );
 							ImGui::Begin( ".", nullptr, ImGuiWindowFlags_NoDecoration );
@@ -586,28 +611,17 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 					}
 
 #ifdef DEBUG_LINE
-					// draw direction
-					{
-						auto _xCenter = static_cast<float>( xCenter );
-						auto _yCenter = static_cast<float>( yCenter );
-						auto debugColor = IM_COL32( 0, 255, 0, 255 );
-
-						// draw direction
-						drawList->AddLine( { _xCenter, _yCenter }, { direction.x * 100 + _xCenter, direction.y * 100 + _yCenter }, debugColor, 1 );
-						drawList->AddLine( { _xCenter, _yCenter }, { rotatedDirection.x * 100 + _xCenter, rotatedDirection.y * 100 + _yCenter }, debugColor, 1 );
-					}
-
 					// draw area
 					{
 						auto debugColor = IM_COL32( 0, 255, 0, 255 );
-						auto thickness = 1;
+						auto thickness = 1.f;
 
-						for ( auto pointIndex = 0; pointIndex < lines.size(); ++pointIndex ) {
-							auto& p0 = lines[pointIndex];
-							auto nextIndex = ( pointIndex + 1 ) % lines.size();
-							auto& p1 = lines[nextIndex];
+						for ( auto pointIndex = 0; pointIndex < linePoints.size(); ++pointIndex ) {
+							auto& pp0 = linePoints[pointIndex];
+							auto nextIndex = ( pointIndex + 1 ) % linePoints.size();
+							auto& pp1 = linePoints[nextIndex];
 
-							drawList->AddLine( { p0.x, p0.y }, { p1.x, p1.y }, debugColor, thickness );
+							drawList->AddLine( { pp0.x, pp0.y }, { pp1.x, pp1.y }, debugColor, thickness );
 						}
 					}
 #endif
@@ -638,7 +652,10 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 					m_lightVertices[0].position = GetCenterPoint( points );
 				}
 
-				CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), m_lightVertices.size() * sizeof( Vertices::value_type ) );
+				auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
+				CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+				m_linePointsCaches.clear();
 				return S_OK;
 			}
 		}
@@ -668,14 +685,15 @@ HRESULT CFreeformLight::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& s
 			};
 			std::for_each( std::next( std::begin( m_lightVertices ) ), std::end( m_lightVertices ), updateFalloff );
 
-			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), m_lightVertices.size() * sizeof( Vertices::value_type ) );
+			auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
+			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
 		}
 	}
 
 	return S_OK;
 }
 
-HRESULT CFreeformLight::CopyToMemory( LPDIRECT3DVERTEXBUFFER9 dest, LPVOID src, size_t size ) const
+HRESULT CFreeformLight::CopyToMemory( LPDIRECT3DVERTEXBUFFER9 dest, LPVOID src, UINT size ) const
 {
 	ASSERT( size );
 
@@ -709,14 +727,14 @@ HRESULT CFreeformLight::UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, In
 
 	// 인덱스 버퍼 갱신
 	{
-		if ( FAILED( pDevice->CreateIndexBuffer( indicesSize, D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &pIndexBuffer, NULL ) ) ) {
+		if ( FAILED( pDevice->CreateIndexBuffer( static_cast<UINT>( indicesSize ), D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &pIndexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
 
 		LPVOID pIndices{};
 
-		if ( pIndexBuffer->Lock( 0, indicesSize, &pIndices, 0 ) ) {
+		if ( pIndexBuffer->Lock( 0, static_cast<UINT>(indicesSize), &pIndices, 0 ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -762,12 +780,12 @@ HRESULT CFreeformLight::UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, 
 
 	// 버텍스 버퍼 갱신
 	{
-		if ( FAILED( pDevice->CreateVertexBuffer( verticesSize, 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
+		if ( FAILED( pDevice->CreateVertexBuffer( static_cast<UINT>(verticesSize), 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
 
-		CopyToMemory( pVertexBuffer, vertices.data(), verticesSize );
+		CopyToMemory( pVertexBuffer, vertices.data(), static_cast<UINT>( verticesSize ) );
 	}
 
 
@@ -783,7 +801,7 @@ D3DXVECTOR3 CFreeformLight::GetCenterPoint( const Points& points ) const
 		return ( p0 + p1 ) / 2.f;
 	};
 	auto getNDivedPoint = []( const D3DXVECTOR3& p0, const D3DXVECTOR3& p1, int i ) -> D3DXVECTOR3 {
-		return p0 + ( p1 - p0 ) / i;
+		return p0 + ( p1 - p0 ) / static_cast<float>( i );
 	};
 	auto center = getMidPoint( points[0], points[1] );
 
@@ -796,7 +814,7 @@ D3DXVECTOR3 CFreeformLight::GetCenterPoint( const Points& points ) const
 
 // https://bowbowbow.tistory.com/24
 BOOL CFreeformLight::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR3& point ) const
-{	
+{
 	//crosses는 점q와 오른쪽 반직선과 다각형과의 교점의 개수
 	auto crosses = 0;
 	auto y = point.y;
@@ -807,9 +825,8 @@ BOOL CFreeformLight::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR
 		auto& p1 = linePoints[nextIndex];
 
 		//점 B가 선분 (p[i], p[j])의 y좌표 사이에 있음
-		if ( ( p0.y > point.y ) != ( p1.y > point.y ) ) {
+		if ( ( p0.y > y ) != ( p1.y > y ) ) {
 			//atX는 점 B를 지나는 수평선과 선분 (p[i], p[j])의 교점
-			//auto at = ( p1.x - p0.x )*( point.y - p0.y ) / ( p1.y - p0.y ) + p0.x;
 			auto at = ( p1.x - p0.x ) * ( y - p0.y ) / ( p1.y - p0.y ) + p0.x;
 
 			//atX가 오른쪽 반직선과의 교점이 맞으면 교점의 개수를 증가시킨다.
@@ -822,34 +839,52 @@ BOOL CFreeformLight::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR
 	return crosses % 2 > 0;
 }
 
-// https://www.geeksforgeeks.org/program-for-point-of-intersection-of-two-lines/
-BOOL CFreeformLight::GetCrossPoint( D3DXVECTOR3& out, const D3DXVECTOR3& a, const D3DXVECTOR3& b, float x ) const
+// http://www.gisdeveloper.co.kr/?p=89
+BOOL CFreeformLight::GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR3 p1, const D3DXVECTOR2& mousePosition ) const
 {
-	D3DXVECTOR3 c = { x, {}, {} };
-	D3DXVECTOR3 d = { x, 10000, {} };
+	using _PointPair = std::pair<D3DXVECTOR2, D3DXVECTOR2>;
+	using _LinePoints = std::initializer_list<_PointPair>;
 
-	auto a1 = b.y - a.y;
-	auto b1 = a.x - b.x;
-	auto c1 = a1 * a.x + b1 * a.y;
-
-	auto a2 = d.y - c.y;
-	auto b2 = c.x - d.x;
-	auto c2 = a2 * c.x + b2 * c.y;
-
-	if ( auto determinant = a1 * b2 - a2 * b1 ) {
-		auto cx = ( b2*c1 - b1*c2 ) / determinant;
-		auto cy = ( a1*c2 - a2*c1 ) / determinant;
-
-		out = { cx, cy, {} };
-		return TRUE;
+	if ( p0.y > p1.y ) {
+		std::swap( p0, p1 );
 	}
-	else {
-		out = {};
-		return FALSE;
+	
+	D3DXVECTOR2 horizonPoint0 = { mousePosition.x, {} };
+	D3DXVECTOR2 horizonPoint1 = { mousePosition.x, static_cast<float>( m_displayMode.Height ) };
+	D3DXVECTOR2 verticalPoint0 = { {}, mousePosition.y };
+	D3DXVECTOR2 verticalPoint1 = { static_cast<float>( m_displayMode.Width ), mousePosition.y };
+
+	// 수직선, 수평선을 그어 교점을 알아낸다
+	for ( auto pair : _LinePoints{ { horizonPoint0, horizonPoint1 }, { verticalPoint0, verticalPoint1 } } ) {
+		auto& q0 = pair.first;
+		auto& q1 = pair.second;
+
+		if ( auto under = ( q1.y - q0.y )*( p1.x - p0.x ) - ( q1.x - q0.x )*( p1.y - p0.y ) ) {
+			auto dx = p0.x - q0.x;
+			auto dy = p0.y - q0.y;			
+			auto t = ( q1.x - q0.x )* dy - ( q1.y - q0.y )* dx;
+			auto s = ( p1.x - p0.x )* dy - ( p1.y - p0.y )* dx;
+			
+			if ( t || s ) {
+				t /= under;
+				s /= under;
+
+				if ( 0 < t && t < 1.f && 0 < s && s < 1.f ) {
+					auto cx = p0.x + t * ( p1.x - p0.x );
+					auto cy = p0.y + t * ( p1.y - p0.y );
+
+					out = { cx, cy, {} };
+					return TRUE;
+				}
+			}
+		}
 	}
+
+	out = {};
+	return FALSE;
 }
 
-HRESULT CFreeformLight::AddLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD index, const D3DXVECTOR3& position )
+HRESULT CFreeformLight::AddLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t index, const D3DXVECTOR3& position )
 {
 	if ( m_lightVertices.size() < index ) {
 		ASSERT( FALSE );
@@ -873,10 +908,11 @@ HRESULT CFreeformLight::AddLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD index, c
 	}
 
 	ClearEditingStates( m_lightVertices.size() );
+	m_linePointsCaches.clear();
 	return S_OK;
 }
 
-HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD index )
+HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t index )
 {
 	auto points = GetPointsFromVertices( m_lightVertices );
 	auto iterator = std::next( std::cbegin( points ), index );
@@ -898,6 +934,7 @@ HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD index
 	}
 
 	ClearEditingStates( m_lightVertices.size() );
+	m_linePointsCaches.clear();
 	return S_OK;
 }
 

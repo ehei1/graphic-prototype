@@ -1,4 +1,5 @@
 #pragma once
+#include <map>
 #include <vector>
 #include <d3dx9.h>
 
@@ -20,7 +21,9 @@ public:
 		inline bool operator!=( const Setting& setting ) const { return !( *this == setting ); }
 	};
 
-	// 
+	CFreeformLight();
+	CFreeformLight( CFreeformLight& ) = delete;
+	
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();
 	HRESULT UpdateLight( LPDIRECT3DDEVICE9, const Setting& );
@@ -62,10 +65,10 @@ private:
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
 	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
-	HRESULT AddLightVertex( LPDIRECT3DDEVICE9, WORD index, const D3DXVECTOR3& position );
-	HRESULT RemoveLightVertex( LPDIRECT3DDEVICE9, WORD index );
+	HRESULT AddLightVertex( LPDIRECT3DDEVICE9, size_t index, const D3DXVECTOR3& position );
+	HRESULT RemoveLightVertex( LPDIRECT3DDEVICE9, size_t index );
 
-	HRESULT CopyToMemory( LPDIRECT3DVERTEXBUFFER9 pDest, LPVOID pSrc, size_t size ) const;
+	HRESULT CopyToMemory( LPDIRECT3DVERTEXBUFFER9 pDest, LPVOID pSrc, UINT size ) const;
 	HRESULT UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, Vertices& vertices, LPDIRECT3DDEVICE9 pDevice, const Points& points, float falloff );
 	// 인덱스 버퍼를 갱신한다
 	HRESULT UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, Indices& indices, LPDIRECT3DDEVICE9, size_t vertexSize ) const;
@@ -75,7 +78,7 @@ private:
 	/*
 	주어진 두 선과의 y 축 간의 교점을 얻는다
 	*/
-	BOOL GetCrossPoint( D3DXVECTOR3& out, const D3DXVECTOR3& p0, const D3DXVECTOR3& p1, float x ) const;
+	BOOL GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR3 p1, const D3DXVECTOR2& mousePosition ) const;
 
 	Points GetPointsFromVertices( const Vertices& ) const;
 	void ClearEditingStates( size_t vertexCount );
@@ -93,15 +96,12 @@ private:
 	};
 	std::vector< D3DXVECTOR3 > m_rightTopSideVertices{
 		{ +1.f, -1.f, 0.f },
-		{ +1.5f, 0.f, 0.f },
 	};
 	std::vector< D3DXVECTOR3 > m_rightBottomVertices{
 		{ +1.0f, +1.f, 0.f },
-		//{ +1.5f,  0.f, 0.f },
 	};
 	std::vector< D3DXVECTOR3 > m_leftBottomVertices{
 		{ -1.f, +1.f, 0.f },
-		{ -1.5f, 0.f, 0.f },
 	};
 	D3DDISPLAYMODE m_displayMode{};
 
@@ -114,4 +114,18 @@ private:
 	Vertices m_lightVertices;
 
 	std::vector<bool> m_vertexEditingStates;
+	
+	D3DXMATRIX m_rotationMatrix{};
+
+	using PointCacheKey = std::pair<size_t, size_t>;
+	struct Cache {
+		const Points m_points;
+		const D3DXVECTOR3 m_from{};
+		const D3DXVECTOR3 m_to{};
+
+		Cache( const Points& points, const D3DXVECTOR3& from, const D3DXVECTOR3& to ) : m_points{ points }, m_from{ from }, m_to{ to }
+		{}
+	};
+	using LinePointsCaches = std::map<PointCacheKey, Cache>;
+	LinePointsCaches m_linePointsCaches;
 };
