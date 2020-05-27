@@ -552,11 +552,8 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 				{
 					const PointCacheKey cacheKey{ i0, i1 };
 					auto iterator = m_linePointsCaches.find( cacheKey );
-					Points linePoints;
-					D3DXVECTOR3 _from;
-					D3DXVECTOR3 _to;
 
-					if ( iterator == std::cend( m_linePointsCaches ) ) {
+					if ( std::cend( m_linePointsCaches ) == iterator ) {
 						auto direction = to - from;
 						D3DXVec3Normalize( &direction, &direction );
 
@@ -565,8 +562,8 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 
 						auto offset = 20.f;
 						auto directionOffset = direction * offset;
-						_from = from + directionOffset;
-						_to = to - directionOffset;
+						auto _from = from + directionOffset;
+						auto _to = to - directionOffset;
 
 						auto width = 10.f;
 						auto xBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y,{} } * width;
@@ -575,23 +572,19 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 						auto p2 = _to - xBias;
 						auto p3 = _to + xBias;
 
-						linePoints = { p0, p1, p2, p3 };
-						m_linePointsCaches.insert( { cacheKey, Cache{ linePoints, _from, _to } } );
-					}
-					else {
-						auto& cache = iterator->second;
-						linePoints = cache.m_points;
-						_from = cache.m_from;
-						_to = cache.m_to;
+						auto cache = Cache<>{ { p0, p1, p2, p3 }, std::move( _from ), std::move( _to ) };
+						iterator = m_linePointsCaches.emplace_hint( iterator, cacheKey, std::move( cache ) );
 					}
 
-					// check area
+					Cache<>& const cache{ iterator->second };
 					auto mousePos = ImGui::GetMousePos();
 
-					if ( IsInsidePolygon( linePoints, { mousePos.x, mousePos.y,{} } ) ) {
+					if ( IsInsidePolygon( cache.m_points, { mousePos.x, mousePos.y,{} } ) ) {
 						hasNoCrossPoint = false;
 
 						D3DXVECTOR3 crossPoint{};
+						auto& const _from = cache.m_from;
+						auto& const _to = cache.m_to;
 
 						if ( GetCrossPoint( crossPoint, _from, _to, { mousePos.x, mousePos.y } ) ) {
 #ifdef DEBUG_LINE

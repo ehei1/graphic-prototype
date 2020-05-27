@@ -118,14 +118,22 @@ private:
 	D3DXMATRIX m_rotationMatrix{};
 
 	using PointCacheKey = std::pair<size_t, size_t>;
-	struct Cache {
-		const Points m_points;
-		const D3DXVECTOR3 m_from{};
-		const D3DXVECTOR3 m_to{};
 
-		Cache( const Points& points, const D3DXVECTOR3& from, const D3DXVECTOR3& to ) : m_points{ points }, m_from{ from }, m_to{ to }
+	template<class POINTS = Points, class VECTOR = D3DXVECTOR3>
+	struct Cache {
+		const POINTS m_points;
+		const VECTOR m_from{};
+		const VECTOR m_to{};
+
+		Cache() = default;
+		Cache( Cache const& ) = delete;
+
+		Cache( POINTS&& points, VECTOR&& from, VECTOR&& to ) : m_points{ std::forward<POINTS>( points ) }, m_from{ std::forward<VECTOR>( from ) }, m_to{ std::forward<VECTOR>( to ) }
+		{}
+
+		Cache( Cache&& c ) : m_points{ std::move( c.m_points ) }, m_from{ c.m_from }, m_to{ c.m_to }
 		{}
 	};
-	using LinePointsCaches = std::map<PointCacheKey, Cache>;
+	using LinePointsCaches = std::map<PointCacheKey, Cache<>>;
 	LinePointsCaches m_linePointsCaches;
 };
