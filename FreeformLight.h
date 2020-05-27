@@ -119,21 +119,22 @@ private:
 
 	using PointCacheKey = std::pair<size_t, size_t>;
 
-	template<class POINTS = Points, class VECTOR = D3DXVECTOR3>
-	struct Cache {
+	template<class POINTS, class VECTOR>
+	struct _Cache {
 		const POINTS m_points;
 		const VECTOR m_from{};
 		const VECTOR m_to{};
 
-		Cache() = default;
-		Cache( Cache const& ) = delete;
+		_Cache() = default;
+		_Cache( _Cache const& ) = delete;
 
-		Cache( POINTS&& points, VECTOR&& from, VECTOR&& to ) : m_points{ std::forward<POINTS>( points ) }, m_from{ std::forward<VECTOR>( from ) }, m_to{ std::forward<VECTOR>( to ) }
+		_Cache( POINTS&& points, VECTOR&& from, VECTOR&& to ) : m_points{ std::forward<POINTS>( points ) }, m_from{ std::forward<VECTOR>( from ) }, m_to{ std::forward<VECTOR>( to ) }
 		{}
 
-		Cache( Cache&& c ) : m_points{ std::move( c.m_points ) }, m_from{ c.m_from }, m_to{ c.m_to }
+		_Cache( _Cache&& c ) : m_points{ std::move( c.m_points ) }, m_from{ c.m_from }, m_to{ c.m_to }
 		{}
 	};
-	using LinePointsCaches = std::map<PointCacheKey, Cache<>>;
+	using Cache = _Cache<Points, D3DXVECTOR3>;
+	using LinePointsCaches = std::map<PointCacheKey, Cache>;
 	LinePointsCaches m_linePointsCaches;
 };

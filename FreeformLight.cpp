@@ -572,11 +572,11 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 						auto p2 = _to - xBias;
 						auto p3 = _to + xBias;
 
-						auto cache = Cache<>{ { p0, p1, p2, p3 }, std::move( _from ), std::move( _to ) };
+						auto cache = Cache{ { p0, p1, p2, p3 }, std::move( _from ), std::move( _to ) };
 						iterator = m_linePointsCaches.emplace_hint( iterator, cacheKey, std::move( cache ) );
 					}
 
-					Cache<>& const cache{ iterator->second };
+					Cache& const cache{ iterator->second };
 					auto mousePos = ImGui::GetMousePos();
 
 					if ( IsInsidePolygon( cache.m_points, { mousePos.x, mousePos.y,{} } ) ) {
