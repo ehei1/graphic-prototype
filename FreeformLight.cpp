@@ -11,6 +11,28 @@
 //#define DEBUG_LINE
 //#define DEBUG_SURFACE
 
+template<class _InIt>
+auto GetCenterPoint(_InIt _First, _InIt _Last)
+{
+	assert(_First != _Last);
+	auto getMidPoint = [](const auto& p0, const auto& p1) {
+		return (p0 + p1) / 2.f;
+	};
+	auto getNDivedPoint = [](const auto& p0, const auto& p1, const auto i) {
+		return p0 + (p1 - p0) / i;
+	};
+	auto itr = _First;
+	const auto& pos0 = *(itr++);
+	if (itr == _Last)
+		return *_First;
+	const auto& pos1 = *(itr++);
+	auto center = getMidPoint(pos0, pos1);
+	decltype(pos0.x) count = 2;
+	for (; itr != _Last; ++itr, ++count) {
+		center = getNDivedPoint(center, *itr, count);
+	}
+	return center;
+}
 
 CFreeformLight::CFreeformLight()
 {
@@ -663,7 +685,7 @@ HRESULT CFreeformLight::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD updat
 					// 첫번째 값은 원점이어서 제외
 					std::transform( std::next( std::cbegin( m_lightVertices ) ), std::cend( m_lightVertices ), std::back_inserter( points ), []( auto& v ) { return v.position; } );
 
-					m_lightVertices[0].position = GetCenterPoint( points );
+					m_lightVertices[0].position = GetCenterPoint( points.begin(), points.end() );
 				}
 
 				auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
@@ -839,23 +861,6 @@ HRESULT CFreeformLight::UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, 
 	return S_OK;
 }
 
-D3DXVECTOR3 CFreeformLight::GetCenterPoint( const Points& points ) const
-{
-	auto getMidPoint = []( const D3DXVECTOR3& p0, const D3DXVECTOR3& p1 ) -> D3DXVECTOR3 {
-		return ( p0 + p1 ) / 2.f;
-	};
-	auto getNDivedPoint = []( const D3DXVECTOR3& p0, const D3DXVECTOR3& p1, int i ) -> D3DXVECTOR3 {
-		return p0 + ( p1 - p0 ) / static_cast<float>( i );
-	};
-	auto center = getMidPoint( points[0], points[1] );
-
-	for ( auto i = 2; i < points.size(); ++i ) {
-		center = getNDivedPoint( center, points[i], i );
-	}
-
-	return center;
-}
-
 // https://bowbowbow.tistory.com/24
 BOOL CFreeformLight::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR3& point ) const
 {
@@ -964,7 +969,7 @@ HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t ind
 	points.erase( iterator );
 	ASSERT( !points.empty() );
 
-	points[0] = GetCenterPoint( points );
+	points[0] = GetCenterPoint(points.begin(), points.end());
 
 	if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, m_setting.falloff ) ) ) {
 		ASSERT( FALSE );

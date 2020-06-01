@@ -77,7 +77,6 @@ private:
 	// 인덱스 버퍼를 갱신한다
 	HRESULT UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, Indices& indices, LPDIRECT3DDEVICE9, size_t vertexSize ) const;
 	// 중점을 얻는다
-	D3DXVECTOR3 GetCenterPoint( const Points& ) const;
 	BOOL IsInsidePolygon( const Points&, const D3DXVECTOR3& point ) const;
 	/*
 	주어진 두 선과의 y 축 간의 교점을 얻는다
