@@ -88,9 +88,7 @@ HRESULT InitD3D( HWND hWnd )
 	d3dpp.PresentationInterval = D3DPRESENT_INTERVAL_ONE;
 
     // Create the D3DDevice
-    if( FAILED( g_pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd,
-		D3DCREATE_HARDWARE_VERTEXPROCESSING,
-                                      &d3dpp, &g_pd3dDevice ) ) )
+    if( FAILED( g_pD3D->CreateDevice( D3DADAPTER_DEFAULT, D3DDEVTYPE_HAL, hWnd, D3DCREATE_MULTITHREADED | D3DCREATE_HARDWARE_VERTEXPROCESSING | D3DCREATE_FPU_PRESERVE, &d3dpp, &g_pd3dDevice ) ) )
     {
         return E_FAIL;
     }

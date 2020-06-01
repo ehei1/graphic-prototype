@@ -2,7 +2,10 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
+#include <tuple>
 #include <unordered_set>
+
+#include "utility\zip.h"
 #include "FreeformLight.h"
 
 //#define DEBUG_LINE
@@ -480,9 +483,8 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 
 		auto controlOffset = 20.f;
 
-		// 이동 가능한 단추를 그린다. 사실은 부유 창. 
-		// 첫째 점은 원점이며, 마지막 점은 첫번째 정점으로 돌아오는 점이므로 그리지 않는다
-		for ( auto i = 1; i < projectedPoints.size(); ++i ) {
+		// 이동 가능한 단추를 그린다. 사실은 부유 창
+		for ( auto i = 0; i < projectedPoints.size(); ++i ) {
 			auto index = m_lightIndices[i];
 			auto& projectedPoint = projectedPoints[index];
 			auto name = std::to_string( i );
@@ -508,12 +510,31 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 					_Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
 
 					if ( p0 != p1 ) {
-						D3DXVECTOR3 out{};
-						D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
-						D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
-						out.z = {};
+						if ( i ) {
+							D3DXVECTOR3 out{};
+							D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
+							D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
+							out.z = {};
 
-						UpdateLightVertex( index, out );
+							if ( FAILED( UpdateLightVertex( index, out ) ) ) {
+								return E_FAIL;
+							}
+						}
+						// 정점 전체 이동
+						else {
+							auto dx = p1.first - p0.first;
+							auto dy = p1.second - p0.second;
+
+							auto movePoints = [&dx, &dy]( const CUSTOM_VERTEX& vertex ) {
+								return vertex.position + D3DXVECTOR3{ static_cast<float>( dx ), static_cast<float>( dy ), {} };
+							};
+							Points points;
+							std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), movePoints );
+
+							if ( FAILED( UpdateLightVertex( points ) ) ) {
+								return E_FAIL;
+							}
+						}
 					}
 
 					ImGui::Text( "%s", name.c_str() );
@@ -652,6 +673,25 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 				return S_OK;
 			}
 		}
+	}
+
+	return E_FAIL;
+}
+
+HRESULT CFreeformLight::UpdateLightVertex( const Points& points )
+{
+	if ( m_pLightVertexBuffer ) {
+		ASSERT( m_lightVertices.size() == points.size() );
+
+		for ( size_t i{}; i < points.size(); ++i ) {
+			m_lightVertices[i].position = points[i];
+		}
+
+		auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
+		CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+		m_linePointsCaches.clear();
+		return S_OK;
 	}
 
 	return E_FAIL;

@@ -65,6 +65,7 @@ private:
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
 	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
+	HRESULT UpdateLightVertex( const Points& );
 	HRESULT AddLightVertex( LPDIRECT3DDEVICE9, size_t index, const D3DXVECTOR3& position );
 	HRESULT RemoveLightVertex( LPDIRECT3DDEVICE9, size_t index );
 
