@@ -350,6 +350,7 @@ VOID Render()
 			}
 
 			SAFE_RELEASE( pScreenSurface );
+			SAFE_RELEASE( curRT );
 		}
 	}
 

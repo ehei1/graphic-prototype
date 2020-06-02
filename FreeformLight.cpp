@@ -5,7 +5,7 @@
 #include <tuple>
 #include <unordered_set>
 
-#include "utility\zip.h"
+#include "pytempl\zip.h"
 #include "FreeformLight.h"
 
 //#define DEBUG_LINE
@@ -22,6 +22,8 @@ void CFreeformLight::InvalidateDeviceObjects()
 	SAFE_RELEASE( m_pLightTexture );
 	SAFE_RELEASE( m_pLightIndexBuffer );
 	SAFE_RELEASE( m_pLightVertexBuffer );
+	SAFE_RELEASE( m_pMaskMesh );
+	SAFE_RELEASE( m_blurMask.m_pTexture );
 }
 
 HRESULT CFreeformLight::RestoreDevice( const D3DDISPLAYMODE& displayMode )
@@ -70,9 +72,12 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 		ASSERT( FALSE );
 		return E_FAIL;
 	}
-
-	if ( FAILED( UpdateLightIndexBuffer( &m_pLightIndexBuffer, m_lightIndices, pDevice, points.size() ) ) ) {
+	else if ( FAILED( UpdateLightIndexBuffer( &m_pLightIndexBuffer, m_lightIndices, pDevice, points.size() ) ) ) {
 		ASSERT( FALSE );
+		return E_FAIL;
+	}
+	// 현재 메시를 마스크로 찍어낸다. 정점이 업데이트된 경우에도 그러함
+	else if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
 		return E_FAIL;
 	}
 
@@ -175,6 +180,19 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 			}
 		}
 #endif
+	}
+
+	// 마스크 메시를 그린다
+	if ( SUCCEEDED( pDevice->BeginScene() ) ) {
+		D3DMATRIX vm{};
+		pDevice->GetTransform( D3DTS_VIEW, &vm );
+		pDevice->SetTransform( D3DTS_VIEW, &m_blurMask.m_transform );
+		
+		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
+		m_pMaskMesh->DrawSubset( 0 );
+
+		pDevice->SetTransform( D3DTS_VIEW, &vm );
+		pDevice->EndScene();
 	}
 
 	// 뷰 행렬 복원
@@ -516,7 +534,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 							D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
 							out.z = {};
 
-							if ( FAILED( UpdateLightVertex( index, out ) ) ) {
+							if ( FAILED( UpdateLightVertex( pDevice, index, out ) ) ) {
 								return E_FAIL;
 							}
 						}
@@ -531,7 +549,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 							Points points;
 							std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), movePoints );
 
-							if ( FAILED( UpdateLightVertex( points ) ) ) {
+							if ( FAILED( UpdateLightVertex( pDevice, points ) ) ) {
 								return E_FAIL;
 							}
 						}
@@ -647,7 +665,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 	return S_OK;
 }
 
-HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3& position )
+HRESULT CFreeformLight::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD updatingIndex, const D3DXVECTOR3& position )
 {
 	if ( m_pLightVertexBuffer ) {
 		for ( auto index : m_lightIndices ) {
@@ -669,6 +687,12 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 				auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
 				CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
 
+				if( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
+					assert( FALSE );
+					
+					return E_FAIL;
+				}
+
 				m_linePointsCaches.clear();
 				return S_OK;
 			}
@@ -678,17 +702,23 @@ HRESULT CFreeformLight::UpdateLightVertex( WORD updatingIndex, const D3DXVECTOR3
 	return E_FAIL;
 }
 
-HRESULT CFreeformLight::UpdateLightVertex( const Points& points )
+HRESULT CFreeformLight::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, const Points& points )
 {
 	if ( m_pLightVertexBuffer ) {
 		ASSERT( m_lightVertices.size() == points.size() );
 
-		for ( size_t i{}; i < points.size(); ++i ) {
-			m_lightVertices[i].position = points[i];
+		auto zip = pytempl::zip( points, m_lightVertices );
+
+		for ( auto iter : zip ) {
+			auto &p = std::get<0>( iter );
+			auto &v = std::get<1>( iter );
+			v.position = p;
 		}
 
 		auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
 		CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+		UpdateBlurMask( pDevice, m_lightVertices );
 
 		m_linePointsCaches.clear();
 		return S_OK;
@@ -965,6 +995,11 @@ HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t ind
 
 		return E_FAIL;
 	}
+	else if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
+		ASSERT( FALSE );
+
+		return E_FAIL;
+	}
 
 	ClearEditingStates( m_lightVertices.size() );
 	m_linePointsCaches.clear();
@@ -985,4 +1020,120 @@ void CFreeformLight::ClearEditingStates( size_t vertexCount )
 {
 	m_vertexEditingStates.clear();
 	m_vertexEditingStates.resize( vertexCount );
+}
+
+HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertices& vertices )
+{
+	if ( !m_pMaskMesh ) {
+		if ( FAILED( CreateMesh( pDevice, &m_pMaskMesh, 1, 1 ) ) ) {
+			return E_FAIL;
+		}
+	}
+
+	float width{};
+	float height{};
+
+	// 마스크 메시의 위치 설정
+	{
+		float left{ FLT_MAX };
+		float right{ FLT_MIN };
+		float top{ FLT_MAX };
+		float bottom{ FLT_MIN };
+
+		// 정점의 LT, RT, LB, RB를 알아낸다
+		for ( auto& vertice : vertices ) {
+			auto& p = vertice.position;
+			left = min( left, p.x );
+			top = min( top, p.y );
+			right = max( right, p.x );
+			bottom = max( bottom, p.y );
+		}
+
+		// w, h를 구한다
+		width = right - left;
+		height = bottom - top;
+		auto cx = left - width / 2;
+		auto cy = top - height / 2;
+
+		// 크기 행렬
+		D3DXMATRIX sm{};
+		D3DXMatrixScaling( &sm, width * 2, height * 2, 1 );
+		// 이동 행렬
+		D3DXMATRIX tm{};
+		D3DXMatrixTranslation( &tm, cx, -cy, 0 );
+
+		m_blurMask.m_transform = sm * tm;
+	}
+
+	// 마스크 복사
+	{
+		auto& pTexture = m_blurMask.m_pTexture;
+
+		// 크기가 다르면 다시 만든다
+		if ( pTexture ) {
+			LPDIRECT3DSURFACE9 pSurface{};
+			pTexture->GetSurfaceLevel( 0, &pSurface );
+
+			D3DSURFACE_DESC desc{};
+			pSurface->GetDesc( &desc );
+
+			if ( desc.Width != static_cast<UINT>( width ) || desc.Height != static_cast<UINT>( height ) ) {
+				SAFE_RELEASE( pTexture );
+			}
+		}
+		
+		if ( !pTexture ) {
+			if ( FAILED( CreateTexture( pDevice, &pTexture, width, height ) ) ) {
+				return E_FAIL;
+			}
+		}
+
+		// 마스크를 중앙에 복사한다
+		// TODO Draw() 함수에 동일한 코드가 있다. 허나 블러 마스크를 그리게 되면 해당 코드는 지워진다
+		if ( SUCCEEDED( pDevice->BeginScene() ) ) {
+			LPDIRECT3DSURFACE9 pCurrrentSurface{};
+			pDevice->GetRenderTarget( 0, &pCurrrentSurface );
+			pDevice->SetTexture( 0, m_pLightTexture );
+			
+			D3DVERTEXBUFFER_DESC vertexBufferDesc = {};
+			m_pLightVertexBuffer->GetDesc( &vertexBufferDesc );
+
+			auto primitiveCount = m_lightIndices.size() - 2;
+
+			DWORD curFVF = {};
+			pDevice->GetFVF( &curFVF );
+			pDevice->SetFVF( vertexBufferDesc.FVF );
+			pDevice->SetTexture( 0, m_pLightTexture );
+			pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
+			pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
+			pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, sizeof( Vertices::value_type ) );
+			pDevice->SetIndices( m_pLightIndexBuffer );
+			pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, static_cast<UINT>( m_lightVertices.size() ), 0, static_cast<UINT>( primitiveCount ) );
+			pDevice->SetFVF( curFVF );
+
+			pDevice->EndScene();
+			pDevice->SetRenderTarget( 0, pCurrrentSurface );
+			SAFE_RELEASE( pCurrrentSurface );
+		}
+	}
+
+	// 블러 처리한다
+	{
+		auto shaderFlags = D3DXFX_NOT_CLONEABLE;
+
+#ifdef _DEBUG
+		shaderFlags |= D3DXSHADER_DEBUG | D3DXSHADER_SKIPOPTIMIZATION | D3DXSHADER_FORCE_VS_SOFTWARE_NOOPT | D3DXSHADER_FORCE_PS_SOFTWARE_NOOPT;
+#endif
+
+		/*if ( FAILED( D3DXCreateEffectFromFile( pDevice, L"HLSL\\blur.fx", nullptr, nullptr, shaderFlags, nullptr, &m_pBlurEffect, nullptr ) ) ) {
+			ASSERT( FALSE );
+
+			return E_FAIL;
+		}*/
+	}
+
+	// 마스크 만들기... 곧 옵니다
+	// m_blurMask.m_texture = m_pLightTexture;
+
+	return S_OK;
 }

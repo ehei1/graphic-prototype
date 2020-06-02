@@ -64,8 +64,10 @@ private:
 	HRESULT CreateLightTextureByRenderer( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture ) const;
 	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 	HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
-	HRESULT UpdateLightVertex( WORD index, const D3DXVECTOR3& position );
-	HRESULT UpdateLightVertex( const Points& );
+
+	// 정점을 편집한다
+	HRESULT UpdateLightVertex( LPDIRECT3DDEVICE9, WORD index, const D3DXVECTOR3& position );
+	HRESULT UpdateLightVertex( LPDIRECT3DDEVICE9, const Points& );
 	HRESULT AddLightVertex( LPDIRECT3DDEVICE9, size_t index, const D3DXVECTOR3& position );
 	HRESULT RemoveLightVertex( LPDIRECT3DDEVICE9, size_t index );
 
@@ -83,6 +85,9 @@ private:
 
 	Points GetPointsFromVertices( const Vertices& ) const;
 	void ClearEditingStates( size_t vertexCount );
+
+	// 블러 처리할 마스크를 만든다
+	HRESULT UpdateBlurMask( LPDIRECT3DDEVICE9, const Vertices& );
 
 private:
 	// 개별 프리폼 조명 정보
@@ -138,4 +143,14 @@ private:
 	using Cache = _Cache<Points, D3DXVECTOR3>;
 	using LinePointsCaches = std::map<PointCacheKey, Cache>;
 	LinePointsCaches m_linePointsCaches;
+
+	struct Mask
+	{
+		D3DXMATRIX m_transform{};
+		LPDIRECT3DTEXTURE9 m_pTexture{};
+	}
+	m_blurMask;
+
+	LPD3DXMESH m_pMaskMesh{};
+	LPD3DXEFFECT m_pBlurEffect{};
 };
