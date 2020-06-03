@@ -5,7 +5,7 @@
 #include <tuple>
 #include <unordered_set>
 
-#include "pytempl\zip.h"
+#include "ps_gaussianblur.h"
 #include "FreeformLight.h"
 
 //#define DEBUG_LINE
@@ -24,6 +24,7 @@ void CFreeformLight::InvalidateDeviceObjects()
 	SAFE_RELEASE( m_pLightVertexBuffer );
 	SAFE_RELEASE( m_pMaskMesh );
 	SAFE_RELEASE( m_blurMask.m_pTexture );
+	SAFE_RELEASE( m_pBlurPixelShader );
 }
 
 HRESULT CFreeformLight::RestoreDevice( const D3DDISPLAYMODE& displayMode )
@@ -94,16 +95,18 @@ HRESULT CFreeformLight::RemoveLight()
 		return S_OK;
 	}
 
+	SAFE_RELEASE( m_pLightTexture );
 	SAFE_RELEASE( m_pLightIndexBuffer );
 	SAFE_RELEASE( m_pLightVertexBuffer );
+	SAFE_RELEASE( m_pMaskMesh );
+	SAFE_RELEASE( m_blurMask.m_pTexture );
+	SAFE_RELEASE( m_pBlurPixelShader );
 
 	return S_OK;
 }
 
-HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSurface, float x, float y )
+HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pMainScreenSurface, float x, float y )
 {
-	_CRT_UNUSED( pSurface );
-
 	if ( !m_pLightVertexBuffer )
 	{
 		return S_OK;
@@ -124,75 +127,54 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSur
 		pDevice->SetTransform( D3DTS_VIEW, &view );
 	}
 
-	// 마스크에 조명을 그린다
-	if ( SUCCEEDED( pDevice->BeginScene() ) )
-	{
+	// 마스크 메시를 그린다
+	if ( SUCCEEDED( pDevice->BeginScene() ) ) {
 		DWORD curBlendOp = {};
 		DWORD curSrcBlend = {};
 		DWORD curDestBlend = {};
 		pDevice->GetRenderState( D3DRS_BLENDOP, &curBlendOp );
 		pDevice->GetRenderState( D3DRS_DESTBLEND, &curDestBlend );
 		pDevice->GetRenderState( D3DRS_SRCBLEND, &curSrcBlend );
+		DWORD fillMode{};
+		pDevice->GetRenderState( D3DRS_FILLMODE, &fillMode );
 
-		D3DVERTEXBUFFER_DESC vertexBufferDesc = {};
-		m_pLightVertexBuffer->GetDesc( &vertexBufferDesc );
+		D3DMATRIX wm{};
+		pDevice->GetTransform( D3DTS_WORLD, &wm );
+		pDevice->SetTransform( D3DTS_WORLD, &m_blurMask.m_worldTransform );
+		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
 
-		auto primitiveCount = m_lightIndices.size() - 2;
-
-		DWORD curFVF = {};
-		pDevice->GetFVF( &curFVF );
-		pDevice->SetFVF( vertexBufferDesc.FVF );
-		pDevice->SetTexture( 0, m_pLightTexture );
-		pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
-		pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
 		// 마스크를 덮어쓴다
 		// result = src * srcAlpha + dest * ( 1 - srcAlpha )
 		pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
 		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
-		pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, sizeof( Vertices::value_type ) );
-		pDevice->SetIndices( m_pLightIndexBuffer );
-		pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, static_cast<UINT>( m_lightVertices.size() ), 0, static_cast<UINT>( primitiveCount ) );
+
+		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
+		m_pMaskMesh->DrawSubset( 0 );
+
+		if ( m_setting.meshVisible ) {
+			LPDIRECT3DSURFACE9 pOldSurface{};
+			pDevice->GetRenderTarget( 0, &pOldSurface );
+			pDevice->SetRenderTarget( 0, pMainScreenSurface );
+
+			pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
+			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ONE );
+			pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
+			pDevice->SetRenderState( D3DRS_FILLMODE, D3DFILL_WIREFRAME );
+			m_pMaskMesh->DrawSubset( 0 );
+
+			pDevice->SetRenderTarget( 0, pOldSurface );
+			SAFE_RELEASE( pOldSurface );
+		}
+
 		pDevice->EndScene();
 
-		pDevice->SetFVF( curFVF );
+		pDevice->SetTransform( D3DTS_WORLD, &wm );
 
 		pDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
 		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
-
-#ifdef DEBUG_SURFACE
-		D3DSURFACE_DESC surfaceDesc{};
-
-		if ( SUCCEEDED( pSurface->GetDesc( &surfaceDesc ) ) ) {
-			LPDIRECT3DTEXTURE9 pScreenshotTexture{};
-
-			if ( SUCCEEDED( pDevice->CreateTexture( surfaceDesc.Width, surfaceDesc.Height, 1, surfaceDesc.Usage, surfaceDesc.Format, surfaceDesc.Pool, &pScreenshotTexture, NULL ) ) ) {
-				LPDIRECT3DSURFACE9 pScreenshotSurface{};
-
-				if ( SUCCEEDED( pScreenshotTexture->GetSurfaceLevel( 0, &pScreenshotSurface ) ) ) {
-					if ( SUCCEEDED( pDevice->StretchRect( pSurface, NULL, pScreenshotSurface, NULL, D3DTEXF_NONE ) ) ) {
-						D3DXSaveTextureToFile( TEXT( "D:\\mask.png" ), D3DXIFF_PNG, pScreenshotTexture, NULL );
-					}
-				}
-
-				SAFE_RELEASE( pScreenshotTexture );
-			}
-		}
-#endif
-	}
-
-	// 마스크 메시를 그린다
-	if ( SUCCEEDED( pDevice->BeginScene() ) ) {
-		D3DMATRIX vm{};
-		pDevice->GetTransform( D3DTS_VIEW, &vm );
-		pDevice->SetTransform( D3DTS_VIEW, &m_blurMask.m_transform );
-		
-		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
-		m_pMaskMesh->DrawSubset( 0 );
-
-		pDevice->SetTransform( D3DTS_VIEW, &vm );
-		pDevice->EndScene();
+		pDevice->SetRenderState( D3DRS_FILLMODE, fillMode );
 	}
 
 	// 뷰 행렬 복원
@@ -230,7 +212,6 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 
 			for ( auto x = 0; x < size; ++x ) {
 				auto index = y * size + x;
-
 				colors[index] = D3DCOLOR_ARGB( static_cast<int>( a ), static_cast<int>( r ), static_cast<int>( g ), static_cast<int>( b ) );
 			}
 		}
@@ -241,7 +222,7 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 
 	// 메모리에 쓴 것을 다시 읽어들인다. 이러면 렌더링 가능하게 된다
 	{
-		ID3DXBuffer* buffer = {};
+		LPD3DXBUFFER buffer = {};
 		if ( FAILED( D3DXSaveTextureToFileInMemory( &buffer, D3DXIFF_PNG, pTexture, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
@@ -471,7 +452,8 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 			ImGui::SliderFloat( u8"강도", &newSetting.intensity, 0.f, 1.f );
 			ImGui::SliderFloat( u8"드리움", &newSetting.falloff, 0, 10 );
 			ImGui::Checkbox( u8"도우미", &newSetting.helper );
-			ImGui::Checkbox( u8"마스크", &newSetting.maskOnly );
+			ImGui::Checkbox( u8"마스크", &newSetting.maskVisible );
+			ImGui::Checkbox( u8"메시", &newSetting.meshVisible );
 		}
 	}
 
@@ -707,12 +689,8 @@ HRESULT CFreeformLight::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, const Poin
 	if ( m_pLightVertexBuffer ) {
 		ASSERT( m_lightVertices.size() == points.size() );
 
-		auto zip = pytempl::zip( points, m_lightVertices );
-
-		for ( auto iter : zip ) {
-			auto &p = std::get<0>( iter );
-			auto &v = std::get<1>( iter );
-			v.position = p;
+		for ( size_t i{}; i < points.size(); ++i ) {
+			m_lightVertices[i].position = points[i];
 		}
 
 		auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
@@ -734,6 +712,7 @@ HRESULT CFreeformLight::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& s
 		SAFE_RELEASE( m_pLightTexture );
 
 		CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting );
+		UpdateBlurMask( pDevice, m_lightVertices );
 	}
 
 	// uv 수정
@@ -750,6 +729,8 @@ HRESULT CFreeformLight::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& s
 
 			auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
 			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+			UpdateBlurMask( pDevice, m_lightVertices );
 		}
 	}
 
@@ -1032,6 +1013,9 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 
 	float width{};
 	float height{};
+	float cx{};
+	float cy{};
+	constexpr auto meshScaling = 1.5f;
 
 	// 마스크 메시의 위치 설정
 	{
@@ -1052,22 +1036,37 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 		// w, h를 구한다
 		width = right - left;
 		height = bottom - top;
-		auto cx = left - width / 2;
-		auto cy = top - height / 2;
+		cx = left + width / 2;
+		cy = top + height / 2;
 
 		// 크기 행렬
 		D3DXMATRIX sm{};
-		D3DXMatrixScaling( &sm, width * 2, height * 2, 1 );
+		D3DXMatrixScaling( &sm, width * meshScaling, height * meshScaling, 1 );
 		// 이동 행렬
 		D3DXMATRIX tm{};
-		D3DXMatrixTranslation( &tm, cx, -cy, 0 );
+		D3DXMatrixTranslation( &tm, cx, cy, 0 );
 
-		m_blurMask.m_transform = sm * tm;
+		m_blurMask.m_worldTransform = sm * tm;
 	}
+
+	// 블러 이펙트를 읽는다
+	if ( !m_pBlurPixelShader )
+	{
+		auto function = const_cast<BYTE*>( g_ps21_gaussianblur );
+		
+		if ( FAILED( pDevice->CreatePixelShader( reinterpret_cast<LPDWORD>( function ), &m_pBlurPixelShader ) ) ) {
+			SAFE_RELEASE( m_pBlurPixelShader );
+			return E_FAIL;
+		}
+	}
+
+	constexpr float textureScaling = 0.5f;
 
 	// 마스크 복사
 	{
 		auto& pTexture = m_blurMask.m_pTexture;
+		auto maskWidth = width * textureScaling;
+		auto mashHeight = height * textureScaling;
 
 		// 크기가 다르면 다시 만든다
 		if ( pTexture ) {
@@ -1077,63 +1076,112 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 			D3DSURFACE_DESC desc{};
 			pSurface->GetDesc( &desc );
 
-			if ( desc.Width != static_cast<UINT>( width ) || desc.Height != static_cast<UINT>( height ) ) {
+			SAFE_RELEASE( pSurface );
+
+			if ( desc.Width != static_cast<UINT>( maskWidth ) || desc.Height != static_cast<UINT>( mashHeight ) ) {
 				SAFE_RELEASE( pTexture );
 			}
 		}
 		
 		if ( !pTexture ) {
-			if ( FAILED( CreateTexture( pDevice, &pTexture, width, height ) ) ) {
+			if ( FAILED( CreateTexture( pDevice, &pTexture, maskWidth, mashHeight ) ) ) {
 				return E_FAIL;
 			}
 		}
 
 		// 마스크를 중앙에 복사한다
-		// TODO Draw() 함수에 동일한 코드가 있다. 허나 블러 마스크를 그리게 되면 해당 코드는 지워진다
 		if ( SUCCEEDED( pDevice->BeginScene() ) ) {
+			DWORD curBlendOp{};
+			DWORD curDestBlend{};
+			DWORD curSrcBlend{};
+
 			LPDIRECT3DSURFACE9 pCurrrentSurface{};
 			pDevice->GetRenderTarget( 0, &pCurrrentSurface );
-			pDevice->SetTexture( 0, m_pLightTexture );
-			
+
+			LPDIRECT3DSURFACE9 pMaskSurface{};
+			m_blurMask.m_pTexture->GetSurfaceLevel( 0, &pMaskSurface );
+			pDevice->SetRenderTarget( 0, pMaskSurface );
+			pDevice->Clear( 0, NULL, D3DCLEAR_TARGET, D3DCOLOR_ARGB( 0, 0, 0, 0 ), 1.0f, 0 );
+
+			D3DXMATRIX oldVm{};
+			pDevice->GetTransform( D3DTS_VIEW, &oldVm );
+
+			D3DXMATRIX oldWm{};
+			pDevice->GetTransform( D3DTS_WORLD, &oldWm );
+
+			D3DXMATRIX oldPm{};
+			pDevice->GetTransform( D3DTS_PROJECTION, &oldPm );
+
+			// 새 행렬 설정
+			{
+				D3DXMATRIX pm{};
+				D3DXMatrixOrthoLH( &pm, width, height, -1, 1 );
+				pDevice->SetTransform( D3DTS_PROJECTION, &pm );
+
+				auto x = width / 2.f;
+				auto y = height / 2.f;
+				D3DXVECTOR3 eye{ x, y, 1 };
+				D3DXVECTOR3 at{ x, y, -1 };
+				D3DXVECTOR3 up{ 0, -1, 0 };
+
+				D3DXMATRIX vm{};
+				D3DXMatrixLookAtLH( &vm, &eye, &at, &up );
+
+				D3DSURFACE_DESC desc{};
+				pMaskSurface->GetDesc( &desc );
+
+				D3DXMATRIX sm{};
+				D3DXMatrixScaling( &sm, width / desc.Width / meshScaling * textureScaling, height / desc.Height / meshScaling * textureScaling, 1.f );
+				vm *= sm;
+				pDevice->SetTransform( D3DTS_VIEW, &vm );
+
+				D3DXMATRIX tm{};
+				D3DXMatrixTranslation( &tm, x - cx, y - cy, 0 );
+				pDevice->SetTransform( D3DTS_WORLD, &tm );
+			}
+
 			D3DVERTEXBUFFER_DESC vertexBufferDesc = {};
 			m_pLightVertexBuffer->GetDesc( &vertexBufferDesc );
 
 			auto primitiveCount = m_lightIndices.size() - 2;
 
-			DWORD curFVF = {};
-			pDevice->GetFVF( &curFVF );
+			DWORD oldFVF = {};
+			pDevice->GetFVF( &oldFVF );
 			pDevice->SetFVF( vertexBufferDesc.FVF );
 			pDevice->SetTexture( 0, m_pLightTexture );
 			pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSU, D3DTADDRESS_CLAMP );
 			pDevice->SetSamplerState( 0, D3DSAMP_ADDRESSV, D3DTADDRESS_CLAMP );
 			pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, sizeof( Vertices::value_type ) );
 			pDevice->SetIndices( m_pLightIndexBuffer );
-			pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, static_cast<UINT>( m_lightVertices.size() ), 0, static_cast<UINT>( primitiveCount ) );
-			pDevice->SetFVF( curFVF );
+			pDevice->SetPixelShader( m_pBlurPixelShader );
+			
+			const D3DXVECTOR4 blurDatas[] = {
+				{ 0.f, width, 0.f, 0.f },
+				{ 1.f, width, 0.f, 0.f },
+			};
+
+			for ( auto& blurData : blurDatas ) {
+				pDevice->SetPixelShaderConstantF( 0, blurData, 1 );
+				pDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, static_cast<UINT>( m_lightVertices.size() ), 0, static_cast<UINT>( primitiveCount ) );
+			}
+
+			pDevice->SetPixelShader( nullptr );
+			pDevice->SetFVF( oldFVF );
 
 			pDevice->EndScene();
 			pDevice->SetRenderTarget( 0, pCurrrentSurface );
+			pDevice->SetTransform( D3DTS_VIEW, &oldVm );
+			pDevice->SetTransform( D3DTS_PROJECTION, &oldPm );
+			pDevice->SetTransform( D3DTS_WORLD, &oldWm );
+
 			SAFE_RELEASE( pCurrrentSurface );
+			SAFE_RELEASE( pMaskSurface );
+
+//#ifdef DEBUG_SURFACE
+			D3DXSaveTextureToFile( TEXT( "D:\\lightTex.png" ), D3DXIFF_PNG, m_blurMask.m_pTexture, NULL );
+//#endif
 		}
 	}
-
-	// 블러 처리한다
-	{
-		auto shaderFlags = D3DXFX_NOT_CLONEABLE;
-
-#ifdef _DEBUG
-		shaderFlags |= D3DXSHADER_DEBUG | D3DXSHADER_SKIPOPTIMIZATION | D3DXSHADER_FORCE_VS_SOFTWARE_NOOPT | D3DXSHADER_FORCE_PS_SOFTWARE_NOOPT;
-#endif
-
-		/*if ( FAILED( D3DXCreateEffectFromFile( pDevice, L"HLSL\\blur.fx", nullptr, nullptr, shaderFlags, nullptr, &m_pBlurEffect, nullptr ) ) ) {
-			ASSERT( FALSE );
-
-			return E_FAIL;
-		}*/
-	}
-
-	// 마스크 만들기... 곧 옵니다
-	// m_blurMask.m_texture = m_pLightTexture;
 
 	return S_OK;
 }

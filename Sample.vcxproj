@@ -202,8 +202,7 @@
       <EnableDPIAwareness>true</EnableDPIAwareness>
     </Manifest>
     <PreBuildEvent>
-      <Command>
-      </Command>
+      <Command>fxc /T ps_2_a /Vn g_ps21_gaussianblur HLSL\ps_gaussianblur.fx /Fh ps_gaussianblur.h </Command>
     </PreBuildEvent>
     <PostBuildEvent>
       <Command>copy $(SolutionDir)resource $(OutDir) /y</Command>
@@ -393,6 +392,13 @@
     <ClCompile Include="main.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <FxCompile Include="HLSL\ps_gaussianblur.fx">
+      <EnableDebuggingInformation Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</EnableDebuggingInformation>
+      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
+      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">3.0</ShaderModel>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+      </ExcludedFromBuild>
+    </FxCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="FreeformLight.h" />

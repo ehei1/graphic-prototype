@@ -14,7 +14,8 @@ public:
 		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 255 / 2, 255 / 2, 255 / 2 );
 		float intensity = 1.f;
 		float falloff = 1.f;
-		bool maskOnly{};
+		bool maskVisible{};
+		bool meshVisible{};
 		bool helper{};
 
 		inline bool operator==( const Setting& setting ) const { return !memcmp( &setting, this, sizeof( setting ) ); }
@@ -34,7 +35,7 @@ public:
 	// pSurface: 조명을 그릴 표면
 	// x: 조명을 그릴 위치
 	// y: 조명을 그릴 위치
-	HRESULT Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pSurface, float x, float y );
+	HRESULT Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pMainScreenSurface, float x, float y );
 	HRESULT RestoreDevice( const D3DDISPLAYMODE& );
 	void InvalidateDeviceObjects();
 	inline void Uninitialize() { InvalidateDeviceObjects(); }
@@ -146,11 +147,11 @@ private:
 
 	struct Mask
 	{
-		D3DXMATRIX m_transform{};
+		D3DXMATRIX m_worldTransform{};
 		LPDIRECT3DTEXTURE9 m_pTexture{};
 	}
 	m_blurMask;
 
 	LPD3DXMESH m_pMaskMesh{};
-	LPD3DXEFFECT m_pBlurEffect{};
+	LPDIRECT3DPIXELSHADER9 m_pBlurPixelShader{};
 };

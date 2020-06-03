@@ -293,8 +293,11 @@ VOID Render()
 		// Begin the scene
 		if ( SUCCEEDED( g_pd3dDevice->BeginScene() ) )
 		{
-			// Setup the world, view, and projection matrices
-			//SetupMatrices();
+			DWORD currentFVF = {};
+			g_pd3dDevice->GetFVF( &currentFVF );
+			g_pd3dDevice->SetStreamSource( 0, g_pVB, 0, sizeof( CUSTOM_VERTEX ) );
+			g_pd3dDevice->SetIndices( g_pIB );
+			g_pd3dDevice->SetFVF( D3DFVF_CUSTOM );
 
 			DWORD curBlendOp = {};
 			DWORD curSrcBlend = {};
@@ -307,25 +310,18 @@ VOID Render()
 			g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_ONE );
 			g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_ZERO );
 
-			DWORD currentFVF = {};
-			g_pd3dDevice->GetFVF( &currentFVF );
-
-			// Render the vertex buffer contents
 			g_pd3dDevice->SetTexture( 0, g_pBackgroundTexture );
-			g_pd3dDevice->SetStreamSource( 0, g_pVB, 0, sizeof( CUSTOM_VERTEX ) );
-
-			g_pd3dDevice->SetIndices( g_pIB );
-			g_pd3dDevice->SetFVF( D3DFVF_CUSTOM );
 			g_pd3dDevice->DrawIndexedPrimitive( D3DPT_TRIANGLEFAN, 0, 0, 4, 0, 2 );
+
+			g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
+			g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
+			g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 
 			// End the scene
 			g_pd3dDevice->EndScene();
 
 			// restore previos setting
 			g_pd3dDevice->SetFVF( currentFVF );
-			g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
-			g_pd3dDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
-			g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 
 #ifdef DEBUG_SAMPLE
 			D3DXSaveTextureToFile( L"D:\\screenshot.png", D3DXIFF_PNG, g_pMainScreenTexture, NULL );
@@ -346,7 +342,7 @@ VOID Render()
 
 			if ( g_pFreemformLight->IsVisible() )
 			{
-				g_pFreemformLight->Draw( g_pd3dDevice, pScreenSurface, x + gTranslation.x, y + gTranslation.y );
+				g_pFreemformLight->Draw( g_pd3dDevice, pMainScreenSurface, x + gTranslation.x, y + gTranslation.y );
 			}
 
 			SAFE_RELEASE( pScreenSurface );
@@ -394,7 +390,9 @@ VOID Render()
 			D3DXMatrixTranslation( &tm, x, y, 0 );
 			g_pd3dDevice->SetTransform( D3DTS_WORLD, &tm );
 
-			if ( !g_pFreemformLight->GetSetting().maskOnly ) {
+			auto& setting = g_pFreemformLight->GetSetting();
+
+			if ( !setting.maskVisible ) {
 				// 마스크를 반전해서 게임 화면이 그려진 렌더타겟의 색깔과 곱한다
 				// result = src * 0 + dest * ( 1 - srcAlpha )
 				g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
