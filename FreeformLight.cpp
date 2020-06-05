@@ -137,6 +137,9 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pMai
 		DWORD fillMode{};
 		pDevice->GetRenderState( D3DRS_FILLMODE, &fillMode );
 
+		DWORD oldFVF{};
+		pDevice->GetFVF( &oldFVF );
+
 		D3DMATRIX wm{};
 		pDevice->GetTransform( D3DTS_WORLD, &wm );
 		pDevice->SetTransform( D3DTS_WORLD, &m_blurMask.m_worldTransform );
@@ -149,6 +152,7 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pMai
 		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
 
 		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
+		pDevice->SetFVF( m_pMaskMesh->GetFVF() );
 		m_pMaskMesh->DrawSubset( 0 );
 
 		if ( m_setting.meshVisible ) {
@@ -174,6 +178,8 @@ HRESULT CFreeformLight::Draw( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DSURFACE9 pMai
 		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
 		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
 		pDevice->SetRenderState( D3DRS_FILLMODE, fillMode );
+
+		pDevice->SetFVF( oldFVF );
 	}
 
 	// ºä Çà·Ä º¹¿ø
