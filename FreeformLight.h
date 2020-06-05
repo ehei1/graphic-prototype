@@ -24,7 +24,7 @@ public:
 
 	CFreeformLight();
 	CFreeformLight( CFreeformLight& ) = delete;
-	
+
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();
 	HRESULT UpdateLight( LPDIRECT3DDEVICE9, const Setting& );
@@ -45,6 +45,8 @@ public:
 	HRESULT CreateImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool isAmbientMode, bool* pIsVisible );
 	inline const Setting& GetSetting() const { return m_setting; }
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
+
+	inline void SetBlurPixelShader( LPDIRECT3DPIXELSHADER9 shader ) { m_pBlurPixelShader = shader; }
 
 	static HRESULT CreateMesh( LPDIRECT3DDEVICE9, LPD3DXMESH*, UINT width, UINT height );
 	static HRESULT CreateTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9*, UINT width, UINT height );
@@ -120,7 +122,7 @@ private:
 	Vertices m_lightVertices;
 
 	std::vector<bool> m_vertexEditingStates;
-	
+
 	D3DXMATRIX m_rotationMatrix{};
 
 	using PointCacheKey = std::pair<size_t, size_t>;

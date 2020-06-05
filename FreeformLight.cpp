@@ -5,7 +5,6 @@
 #include <tuple>
 #include <unordered_set>
 
-#include "ps_gaussianblur.h"
 #include "FreeformLight.h"
 
 //#define DEBUG_LINE
@@ -1068,17 +1067,6 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 		D3DXMatrixTranslation( &tm, cx, cy, 0 );
 
 		m_blurMask.m_worldTransform = sm * tm;
-	}
-
-	// 블러 이펙트를 읽는다
-	if ( !m_pBlurPixelShader )
-	{
-		auto function = const_cast<BYTE*>( g_ps21_gaussianblur );
-		
-		if ( FAILED( pDevice->CreatePixelShader( reinterpret_cast<LPDWORD>( function ), &m_pBlurPixelShader ) ) ) {
-			SAFE_RELEASE( m_pBlurPixelShader );
-			return E_FAIL;
-		}
 	}
 
 	constexpr float textureScaling = 0.5f;

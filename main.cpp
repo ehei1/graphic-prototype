@@ -28,6 +28,8 @@
 #pragma warning( disable : 4996 ) // disable deprecated warning 
 #include <strsafe.h>
 #pragma warning( default : 4996 )
+
+#include "ps_gaussianblur.h"
 #include "FreeformLight.h"
 
 //-----------------------------------------------------------------------------
@@ -45,6 +47,7 @@ std::unique_ptr<CFreeformLight> g_pFreemformLight{ new CFreeformLight };
 const D3DDISPLAYMODE	gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
 float					gScale = 100;
 D3DXVECTOR2				gTranslation{};
+LPDIRECT3DPIXELSHADER9  g_pBlurPixelShader{};
 
 // A structure for our custom vertex type. We added texture coordinates
 struct CUSTOM_VERTEX
@@ -108,6 +111,18 @@ HRESULT InitD3D( HWND hWnd )
 	g_pd3dDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_DESTALPHA );    // set dest factor
 	g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );    // set the operation
 
+	// 블러 이펙트를 읽는다
+	if ( !g_pBlurPixelShader )
+	{
+		auto function = const_cast<BYTE*>( g_ps21_gaussianblur );
+
+		if ( FAILED( g_pd3dDevice->CreatePixelShader( reinterpret_cast<LPDWORD>( function ), &g_pBlurPixelShader ) ) ) {
+			SAFE_RELEASE( g_pBlurPixelShader );
+			return E_FAIL;
+		}
+	}
+
+	g_pFreemformLight->SetBlurPixelShader( g_pBlurPixelShader );
 	g_pFreemformLight->RestoreDevice( gDisplayMode );
 
 	if ( FAILED( g_pd3dDevice->CreateTexture( gDisplayMode.Width, gDisplayMode.Height, 1, D3DUSAGE_RENDERTARGET, gDisplayMode.Format, D3DPOOL_DEFAULT, &g_pMainScreenTexture, NULL ) ) ) {
