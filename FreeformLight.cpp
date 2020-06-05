@@ -10,28 +10,6 @@
 //#define DEBUG_LINE
 //#define DEBUG_SURFACE
 
-template<class _InIt>
-auto GetCenterPoint( _InIt _First, _InIt _Last )
-{
-	assert( _First != _Last );
-	auto getMidPoint = []( const auto& p0, const auto& p1 ) {
-		return ( p0 + p1 ) / 2.f;
-	};
-	auto getNDivedPoint = []( const auto& p0, const auto& p1, const auto i ) {
-		return p0 + ( p1 - p0 ) / i;
-	};
-	auto itr = _First;
-	const auto& pos0 = *( itr++ );
-	if ( itr == _Last )
-		return *_First;
-	const auto& pos1 = *( itr++ );
-	auto center = getMidPoint( pos0, pos1 );
-	decltype( pos0.x ) count = 2;
-	for ( ; itr != _Last; ++itr, ++count ) {
-		center = getNDivedPoint( center, *itr, count );
-	}
-	return center;
-}
 
 CFreeformLight::CFreeformLight()
 {
@@ -1189,4 +1167,27 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 	}
 
 	return S_OK;
+}
+
+template<class _InIt>
+D3DXVECTOR3 CFreeformLight::GetCenterPoint( _InIt _First, _InIt _Last ) const
+{
+	assert( _First != _Last );
+	auto getMidPoint = []( const auto& p0, const auto& p1 ) {
+		return ( p0 + p1 ) / 2.f;
+	};
+	auto getNDivedPoint = []( const auto& p0, const auto& p1, const auto i ) {
+		return p0 + ( p1 - p0 ) / i;
+	};
+	auto itr = _First;
+	const auto& pos0 = *( itr++ );
+	if ( itr == _Last )
+		return *_First;
+	const auto& pos1 = *( itr++ );
+	auto center = getMidPoint( pos0, pos1 );
+	decltype( pos0.x ) count = 2;
+	for ( ; itr != _Last; ++itr, ++count ) {
+		center = getNDivedPoint( center, *itr, count );
+	}
+	return center;
 }

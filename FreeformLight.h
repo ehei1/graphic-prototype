@@ -91,6 +91,9 @@ private:
 	// 블러 처리할 마스크를 만든다
 	HRESULT UpdateBlurMask( LPDIRECT3DDEVICE9, const Vertices& );
 
+	template<class _InIt>
+	D3DXVECTOR3 GetCenterPoint( _InIt _First, _InIt _Last ) const;
+
 private:
 	// 개별 프리폼 조명 정보
 	// 텍스처
