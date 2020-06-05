@@ -196,7 +196,7 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 	ASSERT( ceil( log2( size ) ) == floor( log2( size ) ) );
 	LPDIRECT3DTEXTURE9 pTexture = {};
 
-	if ( FAILED( D3DXCreateTexture( pDevice, size, size, 0, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_SYSTEMMEM, &pTexture ) ) ) {
+	if ( FAILED( D3DXCreateTexture( pDevice, size, size, 0, D3DUSAGE_DYNAMIC, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pTexture ) ) ) {
 		ASSERT( FALSE );
 		return E_FAIL;
 	}
@@ -204,7 +204,7 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 	// 그라데이션을 그린다
 	{
 		D3DLOCKED_RECT lockedRect = {};
-		pTexture->LockRect( 0, &lockedRect, NULL, D3DLOCK_READONLY );
+		pTexture->LockRect( 0, &lockedRect, NULL, D3DLOCK_NO_DIRTY_UPDATE );
 		auto* const colors = static_cast<LPDWORD>( lockedRect.pBits );
 		auto intensity = setting.intensity * 255.f;
 		auto& color = setting.lightColor;
@@ -217,26 +217,15 @@ HRESULT CFreeformLight::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice,
 
 			for ( auto x = 0; x < size; ++x ) {
 				auto index = y * size + x;
-				colors[index] = D3DCOLOR_ARGB( static_cast<int>( a ), static_cast<int>( r ), static_cast<int>( g ), static_cast<int>( b ) );
+				colors[index] = D3DCOLOR_ARGB( static_cast<int>( a ), r, g, b );
 			}
 		}
 
-		pTexture->UnlockRect( 0 );
-	}
-
-
-	// 메모리에 쓴 것을 다시 읽어들인다. 이러면 렌더링 가능하게 된다
-	{
-		LPD3DXBUFFER buffer = {};
-		if ( FAILED( D3DXSaveTextureToFileInMemory( &buffer, D3DXIFF_PNG, pTexture, NULL ) ) ) {
-			ASSERT( FALSE );
+		if ( FAILED( pTexture->AddDirtyRect( NULL ) ) ) {
 			return E_FAIL;
 		}
 
-		SAFE_RELEASE( pTexture );
-
-		if ( FAILED( D3DXCreateTextureFromFileInMemory( pDevice, buffer->GetBufferPointer(), buffer->GetBufferSize(), &pTexture ) ) ) {
-			ASSERT( FALSE );
+		if ( FAILED( pTexture->UnlockRect( 0 ) ) ) {
 			return E_FAIL;
 		}
 	}
