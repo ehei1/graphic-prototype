@@ -65,7 +65,7 @@ struct PS_OUT
 };
 
 
-PS_OUT main( PS_IN In ) : COLOR
+PS_OUT main( PS_IN In )
 {
 	PS_OUT Out = (PS_OUT)0;
 	float4 Result = 0;

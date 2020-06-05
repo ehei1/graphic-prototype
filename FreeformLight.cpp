@@ -11,24 +11,24 @@
 //#define DEBUG_SURFACE
 
 template<class _InIt>
-auto GetCenterPoint(_InIt _First, _InIt _Last)
+auto GetCenterPoint( _InIt _First, _InIt _Last )
 {
-	assert(_First != _Last);
-	auto getMidPoint = [](const auto& p0, const auto& p1) {
-		return (p0 + p1) / 2.f;
+	assert( _First != _Last );
+	auto getMidPoint = []( const auto& p0, const auto& p1 ) {
+		return ( p0 + p1 ) / 2.f;
 	};
-	auto getNDivedPoint = [](const auto& p0, const auto& p1, const auto i) {
-		return p0 + (p1 - p0) / i;
+	auto getNDivedPoint = []( const auto& p0, const auto& p1, const auto i ) {
+		return p0 + ( p1 - p0 ) / i;
 	};
 	auto itr = _First;
-	const auto& pos0 = *(itr++);
-	if (itr == _Last)
+	const auto& pos0 = *( itr++ );
+	if ( itr == _Last )
 		return *_First;
-	const auto& pos1 = *(itr++);
-	auto center = getMidPoint(pos0, pos1);
-	decltype(pos0.x) count = 2;
-	for (; itr != _Last; ++itr, ++count) {
-		center = getNDivedPoint(center, *itr, count);
+	const auto& pos1 = *( itr++ );
+	auto center = getMidPoint( pos0, pos1 );
+	decltype( pos0.x ) count = 2;
+	for ( ; itr != _Last; ++itr, ++count ) {
+		center = getNDivedPoint( center, *itr, count );
 	}
 	return center;
 }
@@ -562,7 +562,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 								auto dy = p1.second - p0.second;
 
 								auto movePoints = [&dx, &dy]( const CUSTOM_VERTEX& vertex ) {
-									return vertex.position + D3DXVECTOR3{ static_cast<float>( dx ), static_cast<float>( dy ), {} };
+									return vertex.position + D3DXVECTOR3{ static_cast<float>( dx ), static_cast<float>( dy ),{} };
 								};
 								Points points;
 								std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), movePoints );
@@ -624,7 +624,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 						auto _to = to - directionOffset;
 
 						auto width = 10.f;
-						auto xBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y,{} } * width;
+						auto xBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y,{} } *width;
 						auto p0 = _from + xBias;
 						auto p1 = _from - xBias;
 						auto p2 = _to - xBias;
@@ -634,15 +634,15 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 						iterator = m_linePointsCaches.emplace_hint( iterator, cacheKey, std::move( cache ) );
 					}
 
-					Cache& const cache{ iterator->second };
+					Cache const& cache{ iterator->second };
 					auto mousePos = ImGui::GetMousePos();
 
 					if ( IsInsidePolygon( cache.m_points, { mousePos.x, mousePos.y,{} } ) ) {
 						hasNoCrossPoint = false;
 
 						D3DXVECTOR3 crossPoint{};
-						auto& const _from = cache.m_from;
-						auto& const _to = cache.m_to;
+						auto const& _from = cache.m_from;
+						auto const& _to = cache.m_to;
 
 						if ( GetCrossPoint( crossPoint, _from, _to, { mousePos.x, mousePos.y } ) ) {
 #ifdef DEBUG_LINE
@@ -706,9 +706,9 @@ HRESULT CFreeformLight::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD updat
 				auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
 				CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
 
-				if( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
+				if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
 					assert( FALSE );
-					
+
 					return E_FAIL;
 				}
 
@@ -815,7 +815,7 @@ HRESULT CFreeformLight::UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, In
 
 		LPVOID pIndices{};
 
-		if ( pIndexBuffer->Lock( 0, static_cast<UINT>(indicesSize), &pIndices, 0 ) ) {
+		if ( pIndexBuffer->Lock( 0, static_cast<UINT>( indicesSize ), &pIndices, 0 ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -861,7 +861,7 @@ HRESULT CFreeformLight::UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, 
 
 	// 버텍스 버퍼 갱신
 	{
-		if ( FAILED( pDevice->CreateVertexBuffer( static_cast<UINT>(verticesSize), 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
+		if ( FAILED( pDevice->CreateVertexBuffer( static_cast<UINT>( verticesSize ), 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
 			ASSERT( FALSE );
 			return E_FAIL;
 		}
@@ -912,23 +912,23 @@ BOOL CFreeformLight::GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR
 	if ( p0.y > p1.y ) {
 		std::swap( p0, p1 );
 	}
-	
-	D3DXVECTOR2 horizonPoint0 = { mousePosition.x, {} };
+
+	D3DXVECTOR2 horizonPoint0 = { mousePosition.x,{} };
 	D3DXVECTOR2 horizonPoint1 = { mousePosition.x, static_cast<float>( m_displayMode.Height ) };
 	D3DXVECTOR2 verticalPoint0 = { {}, mousePosition.y };
 	D3DXVECTOR2 verticalPoint1 = { static_cast<float>( m_displayMode.Width ), mousePosition.y };
 
 	// 수직선, 수평선을 그어 교점을 알아낸다
-	for ( auto pair : _LinePoints{ { horizonPoint0, horizonPoint1 }, { verticalPoint0, verticalPoint1 } } ) {
+	for ( auto pair : _LinePoints{ { horizonPoint0, horizonPoint1 },{ verticalPoint0, verticalPoint1 } } ) {
 		auto& q0 = pair.first;
 		auto& q1 = pair.second;
 
 		if ( auto under = ( q1.y - q0.y )*( p1.x - p0.x ) - ( q1.x - q0.x )*( p1.y - p0.y ) ) {
 			auto dx = p0.x - q0.x;
-			auto dy = p0.y - q0.y;			
+			auto dy = p0.y - q0.y;
 			auto t = ( q1.x - q0.x )* dy - ( q1.y - q0.y )* dx;
 			auto s = ( p1.x - p0.x )* dy - ( p1.y - p0.y )* dx;
-			
+
 			if ( t || s ) {
 				t /= under;
 				s /= under;
@@ -937,7 +937,7 @@ BOOL CFreeformLight::GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR
 					auto cx = p0.x + t * ( p1.x - p0.x );
 					auto cy = p0.y + t * ( p1.y - p0.y );
 
-					out = { cx, cy, {} };
+					out = { cx, cy,{} };
 					return TRUE;
 				}
 			}
@@ -984,7 +984,7 @@ HRESULT CFreeformLight::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t ind
 	points.erase( iterator );
 	ASSERT( !points.empty() );
 
-	points[0] = GetCenterPoint(points.begin(), points.end());
+	points[0] = GetCenterPoint( points.begin(), points.end() );
 
 	if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, m_setting.falloff ) ) ) {
 		ASSERT( FALSE );
@@ -1074,8 +1074,8 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 	// 마스크 복사
 	{
 		auto& pTexture = m_blurMask.m_pTexture;
-		auto maskWidth = width * textureScaling;
-		auto mashHeight = height * textureScaling;
+		auto maskWidth = static_cast<UINT>( width * textureScaling );
+		auto maskHeight = static_cast<UINT>( height * textureScaling );
 
 		// 크기가 다르면 다시 만든다
 		if ( pTexture ) {
@@ -1087,23 +1087,19 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 
 			SAFE_RELEASE( pSurface );
 
-			if ( desc.Width != static_cast<UINT>( maskWidth ) || desc.Height != static_cast<UINT>( mashHeight ) ) {
+			if ( desc.Width != maskWidth || desc.Height != maskHeight ) {
 				SAFE_RELEASE( pTexture );
 			}
 		}
-		
+
 		if ( !pTexture ) {
-			if ( FAILED( CreateTexture( pDevice, &pTexture, maskWidth, mashHeight ) ) ) {
+			if ( FAILED( CreateTexture( pDevice, &pTexture, maskWidth, maskHeight ) ) ) {
 				return E_FAIL;
 			}
 		}
 
 		// 마스크를 중앙에 복사한다
 		if ( SUCCEEDED( pDevice->BeginScene() ) ) {
-			DWORD curBlendOp{};
-			DWORD curDestBlend{};
-			DWORD curSrcBlend{};
-
 			LPDIRECT3DSURFACE9 pCurrrentSurface{};
 			pDevice->GetRenderTarget( 0, &pCurrrentSurface );
 
@@ -1163,7 +1159,7 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 			pDevice->SetStreamSource( 0, m_pLightVertexBuffer, 0, sizeof( Vertices::value_type ) );
 			pDevice->SetIndices( m_pLightIndexBuffer );
 			pDevice->SetPixelShader( m_pBlurPixelShader );
-			
+
 			const D3DXVECTOR4 blurDatas[] = {
 				{ 0.f, width, 0.f, 0.f },
 				{ 1.f, width, 0.f, 0.f },
@@ -1186,9 +1182,9 @@ HRESULT CFreeformLight::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertice
 			SAFE_RELEASE( pCurrrentSurface );
 			SAFE_RELEASE( pMaskSurface );
 
-//#ifdef DEBUG_SURFACE
+#ifdef DEBUG_SURFACE
 			D3DXSaveTextureToFile( TEXT( "D:\\lightTex.png" ), D3DXIFF_PNG, m_blurMask.m_pTexture, NULL );
-//#endif
+#endif
 		}
 	}
 
