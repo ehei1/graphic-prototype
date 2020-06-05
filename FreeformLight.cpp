@@ -439,7 +439,11 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 		return S_OK;
 	}
 
-	ImGui::Begin( u8"조명", pIsVisible );
+	constexpr auto windowTitleName = u8"조명";
+	ImGui::Begin( windowTitleName, pIsVisible );
+
+	auto& io = ImGui::GetIO();
+	io.WantCaptureMouse = true;
 
 	auto pointButtonStyle = ImGuiWindowFlags_NoDecoration - ImGuiWindowFlags_NoTitleBar;
 	auto newSetting = GetSetting();
@@ -484,6 +488,16 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 	ImGui::End();
 
 	if ( freeformLightVisible && m_setting.helper ) {
+		bool mouseHoveringNoWindow = true;
+
+		if ( auto context = ImGui::GetCurrentContext() ) {
+			if ( ImGuiWindow* window = ImGui::FindWindowByName( windowTitleName ) ) {
+				if ( context->HoveredWindow == window ) {
+					mouseHoveringNoWindow = false;
+				}
+			}
+		}
+
 		D3DXMATRIX world{};
 		pDevice->GetTransform( D3DTS_WORLD, &world );
 		D3DXMATRIX view{};
@@ -524,37 +538,39 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 				auto noPointDeleted = i && hasMoreVertexThanTriangle ? &pointClosed : nullptr;
 
 				if ( ImGui::Begin( name.c_str(), noPointDeleted, pointButtonStyle ) ) {
-					isEditing = ImGui::IsItemActive();
-					auto nextPos = ImGui::GetWindowPos();
+					if ( mouseHoveringNoWindow ) {
+						isEditing = ImGui::IsItemActive();
+						auto nextPos = ImGui::GetWindowPos();
 
-					using _Position = std::pair<int, int>;
-					_Position p0{ static_cast<int>( projectedPoint.x ), static_cast<int>( projectedPoint.y ) };
-					_Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
+						using _Position = std::pair<int, int>;
+						_Position p0{ static_cast<int>( projectedPoint.x ), static_cast<int>( projectedPoint.y ) };
+						_Position p1{ static_cast<int>( nextPos.x ), static_cast<int>( nextPos.y ) };
 
-					if ( p0 != p1 ) {
-						if ( i ) {
-							D3DXVECTOR3 out{};
-							D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
-							D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
-							out.z = {};
+						if ( p0 != p1 ) {
+							if ( i ) {
+								D3DXVECTOR3 out{};
+								D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
+								D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
+								out.z = {};
 
-							if ( FAILED( UpdateLightVertex( pDevice, index, out ) ) ) {
-								return E_FAIL;
+								if ( FAILED( UpdateLightVertex( pDevice, index, out ) ) ) {
+									return E_FAIL;
+								}
 							}
-						}
-						// 정점 전체 이동
-						else {
-							auto dx = p1.first - p0.first;
-							auto dy = p1.second - p0.second;
+							// 정점 전체 이동
+							else {
+								auto dx = p1.first - p0.first;
+								auto dy = p1.second - p0.second;
 
-							auto movePoints = [&dx, &dy]( const CUSTOM_VERTEX& vertex ) {
-								return vertex.position + D3DXVECTOR3{ static_cast<float>( dx ), static_cast<float>( dy ), {} };
-							};
-							Points points;
-							std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), movePoints );
+								auto movePoints = [&dx, &dy]( const CUSTOM_VERTEX& vertex ) {
+									return vertex.position + D3DXVECTOR3{ static_cast<float>( dx ), static_cast<float>( dy ), {} };
+								};
+								Points points;
+								std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), movePoints );
 
-							if ( FAILED( UpdateLightVertex( pDevice, points ) ) ) {
-								return E_FAIL;
+								if ( FAILED( UpdateLightVertex( pDevice, points ) ) ) {
+									return E_FAIL;
+								}
 							}
 						}
 					}
@@ -591,7 +607,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 				drawList->AddLine( { from.x, from.y }, { to.x, to.y }, IM_COL32_WHITE, 2 );
 
 				// 선 주위에 직사각형을 그린다. 이것은 마우스 커서 위치 판정에 쓰인다
-				if ( isNoEditing && hasNoCrossPoint )
+				if ( isNoEditing && hasNoCrossPoint && mouseHoveringNoWindow )
 				{
 					const PointCacheKey cacheKey{ i0, i1 };
 					auto iterator = m_linePointsCaches.find( cacheKey );
