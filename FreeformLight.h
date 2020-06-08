@@ -24,6 +24,7 @@ public:
 
 	CFreeformLight();
 	CFreeformLight( CFreeformLight& ) = delete;
+	~CFreeformLight();
 
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );
 	HRESULT RemoveLight();

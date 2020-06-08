@@ -488,7 +488,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 		auto controlOffset = 20.f;
 
 		// 이동 가능한 단추를 그린다. 사실은 부유 창
-		for ( auto i = 0; i < projectedPoints.size(); ++i ) {
+		for ( size_t i = 0; i < projectedPoints.size(); ++i ) {
 			auto index = m_lightIndices[i];
 			auto& projectedPoint = projectedPoints[index];
 			auto name = std::to_string( i );
@@ -566,7 +566,7 @@ HRESULT CFreeformLight::CreateImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCenter, LO
 			auto hasNoCrossPoint = true;
 			auto isNoEditing = std::none_of( std::cbegin( m_vertexEditingStates ), std::cend( m_vertexEditingStates ), []( bool v ) { return v == true; } );
 
-			for ( auto lightIndex = 2; lightIndex < m_lightIndices.size(); ++lightIndex ) {
+			for ( size_t lightIndex = 2; lightIndex < m_lightIndices.size(); ++lightIndex ) {
 				auto i0 = m_lightIndices[lightIndex - 1];
 				auto i1 = m_lightIndices[lightIndex];
 				auto& from = projectedPoints[i0];
@@ -852,7 +852,7 @@ BOOL CFreeformLight::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR
 	auto crosses = 0;
 	auto y = point.y;
 
-	for ( auto index = 0; index < linePoints.size(); ++index ) {
+	for ( size_t index = 0; index < linePoints.size(); ++index ) {
 		auto nextIndex = ( index + 1 ) % linePoints.size();
 		auto& p0 = linePoints[index];
 		auto& p1 = linePoints[nextIndex];
