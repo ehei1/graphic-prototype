@@ -43,7 +43,7 @@ LPDIRECT3DTEXTURE9      g_pBackgroundTexture = NULL; // Our texture
 LPDIRECT3DTEXTURE9		g_pMainScreenTexture = NULL;
 LPD3DXMESH				g_pScreenMesh = NULL;
 LPDIRECT3DTEXTURE9		g_pScreenTexture = NULL;
-std::unique_ptr<CFreeformLight> g_pFreemformLight{ new CFreeformLight };
+std::unique_ptr<_EditableFreeform> g_pFreemformLight = NULL;
 const D3DDISPLAYMODE	gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
 float					gScale = 100;
 D3DXVECTOR2				gTranslation{};
@@ -122,8 +122,7 @@ HRESULT InitD3D( HWND hWnd )
 		}
 	}
 
-	g_pFreemformLight->SetBlurPixelShader( g_pBlurPixelShader );
-	g_pFreemformLight->RestoreDevice( gDisplayMode );
+	g_pFreemformLight.reset( new _EditableFreeform{ g_pBlurPixelShader, gDisplayMode } );
 
 	if ( FAILED( g_pd3dDevice->CreateTexture( gDisplayMode.Width, gDisplayMode.Height, 1, D3DUSAGE_RENDERTARGET, gDisplayMode.Format, D3DPOOL_DEFAULT, &g_pMainScreenTexture, NULL ) ) ) {
 		return E_FAIL;
@@ -346,21 +345,19 @@ VOID Render()
 		}
 
 		// 프리폼 조명
+		// ambient가 점조명에서 별도로 동작해서 옮기기가 곤란하다
 		{
 			LPDIRECT3DSURFACE9 pScreenSurface{};
 			g_pScreenTexture->GetSurfaceLevel( 0, &pScreenSurface );
 
-			auto clearColor = g_pFreemformLight->GetSetting().shadowColor;
+			auto clearColor = g_pFreemformLight->GetSetting().ambient;
 
 			LPDIRECT3DSURFACE9 curRT = {};
 			g_pd3dDevice->GetRenderTarget( 0, &curRT );
 			g_pd3dDevice->SetRenderTarget( 0, pScreenSurface );
 			g_pd3dDevice->Clear( 0, 0, D3DCLEAR_TARGET, clearColor, 1.0f, 0 );
 
-			if ( g_pFreemformLight->IsVisible() )
-			{
-				g_pFreemformLight->Draw( g_pd3dDevice, pMainScreenSurface, x + gTranslation.x, y + gTranslation.y );
-			}
+			g_pFreemformLight->Draw( g_pd3dDevice, x + gTranslation.x, y + gTranslation.y );
 
 			SAFE_RELEASE( pScreenSurface );
 			SAFE_RELEASE( curRT );
