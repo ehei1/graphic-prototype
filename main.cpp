@@ -212,6 +212,8 @@ VOID Cleanup()
     if( g_pVB != NULL )
         g_pVB->Release();
 
+	g_pFreemformLight.reset();
+
     if( g_pd3dDevice != NULL )
         g_pd3dDevice->Release();
 

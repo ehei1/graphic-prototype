@@ -2,7 +2,6 @@
 #include <algorithm>
 #include <iostream>
 #include <string>
-#include <tuple>
 #include <unordered_set>
 
 #include "FreeformLight.h"
@@ -16,6 +15,11 @@ CFreeformLight::CFreeformLight()
 	D3DXMatrixRotationZ( &m_rotationMatrix, D3DXToRadian( 90 ) );
 }
 
+CFreeformLight::~CFreeformLight()
+{
+	InvalidateDeviceObjects();
+}
+
 void CFreeformLight::InvalidateDeviceObjects()
 {
 	SAFE_RELEASE( m_pLightTexture );
@@ -23,7 +27,6 @@ void CFreeformLight::InvalidateDeviceObjects()
 	SAFE_RELEASE( m_pLightVertexBuffer );
 	SAFE_RELEASE( m_pMaskMesh );
 	SAFE_RELEASE( m_blurMask.m_pTexture );
-	SAFE_RELEASE( m_pBlurPixelShader );
 }
 
 HRESULT CFreeformLight::RestoreDevice( const D3DDISPLAYMODE& displayMode )
@@ -89,17 +92,10 @@ HRESULT CFreeformLight::AddLight( LPDIRECT3DDEVICE9 pDevice, LONG x, LONG y )
 
 HRESULT CFreeformLight::RemoveLight()
 {
-	if ( !m_pLightVertexBuffer )
+	if ( m_pLightVertexBuffer )
 	{
-		return S_OK;
+		InvalidateDeviceObjects();
 	}
-
-	SAFE_RELEASE( m_pLightTexture );
-	SAFE_RELEASE( m_pLightIndexBuffer );
-	SAFE_RELEASE( m_pLightVertexBuffer );
-	SAFE_RELEASE( m_pMaskMesh );
-	SAFE_RELEASE( m_blurMask.m_pTexture );
-	SAFE_RELEASE( m_pBlurPixelShader );
 
 	return S_OK;
 }
@@ -348,7 +344,7 @@ HRESULT CFreeformLight::CreateMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutM
 	constexpr auto faceCount = 2;
 	constexpr auto fvf = D3DFVF_XYZ | D3DFVF_TEX1;
 
-	if ( FAILED( D3DXCreateMeshFVF( faceCount, vertexCount, D3DXMESH_MANAGED, fvf, pDevice, &pMesh ) ) ) {
+	if ( FAILED( D3DXCreateMeshFVF( faceCount, vertexCount, D3DXMESH_WRITEONLY, fvf, pDevice, &pMesh ) ) ) {
 		return E_FAIL;
 	}
 
@@ -368,7 +364,7 @@ HRESULT CFreeformLight::CreateMesh( LPDIRECT3DDEVICE9 pDevice, LPD3DXMESH* pOutM
 		LPVOID pMeshVertices = {};
 		pMesh->LockVertexBuffer( 0, &pMeshVertices );
 		memcpy( pMeshVertices, vertices, sizeof( vertices ) );
-		pMesh->UnlockIndexBuffer();
+		pMesh->UnlockVertexBuffer();
 	}
 
 	// 인덱스 버퍼 채우기
