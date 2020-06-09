@@ -102,7 +102,7 @@ public:
 	HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
 	inline const Setting& GetSetting() const { return m_setting; }
 
-	HRESULT DrawVertexHelper( LPDIRECT3DDEVICE9, D3DDISPLAYMODE const&, char const* windowTitleName );
+	HRESULT DrawHelper( LPDIRECT3DDEVICE9, D3DDISPLAYMODE const&, char const* windowTitleName );
 
 	inline void ClearEditingStates( size_t vertexCount ) { m_vertexEditingStates.clear(); m_vertexEditingStates.resize( vertexCount ); }
 

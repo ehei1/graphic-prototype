@@ -6,8 +6,8 @@
 
 #include "FreeformLight.h"
 
-//#define DEBUG_LINE
-//#define DEBUG_SURFACE
+#define DEBUG_LINE
+#define DEBUG_SURFACE
 
 
 _ImmutableLightImpl::_ImmutableLightImpl( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& points, Setting const& setting ) :
@@ -519,43 +519,17 @@ HRESULT _ImmutableLightImpl::Draw( LPDIRECT3DDEVICE9 pDevice )
 {
 	// 마스크 메시를 그린다
 	if ( SUCCEEDED( pDevice->BeginScene() ) ) {
-		DWORD curBlendOp = {};
-		DWORD curSrcBlend = {};
-		DWORD curDestBlend = {};
-		pDevice->GetRenderState( D3DRS_BLENDOP, &curBlendOp );
-		pDevice->GetRenderState( D3DRS_DESTBLEND, &curDestBlend );
-		pDevice->GetRenderState( D3DRS_SRCBLEND, &curSrcBlend );
-		DWORD fillMode{};
-		pDevice->GetRenderState( D3DRS_FILLMODE, &fillMode );
-
-		DWORD oldFVF{};
-		pDevice->GetFVF( &oldFVF );
-
 		D3DMATRIX wm{};
 		pDevice->GetTransform( D3DTS_WORLD, &wm );
 		pDevice->SetTransform( D3DTS_WORLD, &m_blurMask.m_worldTransform );
 		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
 
-		// 마스크를 덮어쓴다
-		// result = src * srcAlpha + dest * ( 1 - srcAlpha )
-		pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
-		pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
-		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
-
 		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
 		pDevice->SetFVF( m_blurMask.m_pMesh->GetFVF() );
 		m_blurMask.m_pMesh->DrawSubset( 0 );
 
-		pDevice->EndScene();
-
 		pDevice->SetTransform( D3DTS_WORLD, &wm );
-
-		pDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
-		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
-		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
-		pDevice->SetRenderState( D3DRS_FILLMODE, fillMode );
-
-		pDevice->SetFVF( oldFVF );
+		pDevice->EndScene();
 	}
 
 	return S_OK;
@@ -579,34 +553,33 @@ HRESULT _MutableLightImpl::SetSetting( LPDIRECT3DDEVICE9 pDevice, const Setting&
 
 HRESULT _MutableLightImpl::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD updatingIndex, const D3DXVECTOR3& position )
 {
-	if ( m_pLightVertexBuffer ) {
-		for ( auto index : m_lightIndices ) {
-			if ( updatingIndex == index ) {
-				m_lightVertices[index].position = position;
+	for ( auto index : m_lightIndices ) {
+		if ( updatingIndex == index ) {
+			m_lightVertices[index].position = position;
 
-				// 지렛대의 원리로 찾는 중점
-				// https://blog.naver.com/dbtkdwh0/90085488219
-				// 중점 수정이 아니면 자동으로 설정해준다
-				if ( updatingIndex )
-				{
-					Points points;
-					// 첫번째 값은 원점이어서 제외
-					std::transform( std::next( std::cbegin( m_lightVertices ) ), std::cend( m_lightVertices ), std::back_inserter( points ), []( auto& v ) { return v.position; } );
+			// 지렛대의 원리로 찾는 중점
+			// https://blog.naver.com/dbtkdwh0/90085488219
+			// 중점 수정이 아니면 자동으로 설정해준다
+			if ( updatingIndex )
+			{
+				Points points;
+				// 첫번째 값은 원점이어서 제외
+				std::transform( std::next( std::cbegin( m_lightVertices ) ), std::cend( m_lightVertices ), std::back_inserter( points ), []( auto& v ) { return v.position; } );
 
-					m_lightVertices[0].position = GetCenterPoint( points.begin(), points.end() );
-				}
-
-				auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
-				CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
-
-				if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
-					assert( FALSE );
-
-					return E_FAIL;
-				}
-
-				return S_OK;
+				m_lightVertices[0].position = GetCenterPoint( points.begin(), points.end() );
 			}
+
+			auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
+			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+			if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
+				assert( FALSE );
+
+				return E_FAIL;
+			}
+
+			m_linePointsCaches.clear();
+			return S_OK;
 		}
 	}
 
@@ -616,21 +589,22 @@ HRESULT _MutableLightImpl::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, WORD up
 
 HRESULT _MutableLightImpl::UpdateLightVertex( LPDIRECT3DDEVICE9 pDevice, const Points& points )
 {
-	if ( m_pLightVertexBuffer ) {
-		ASSERT( m_lightVertices.size() == points.size() );
+	ASSERT( m_lightVertices.size() == points.size() );
 
-		for ( size_t i{}; i < points.size(); ++i ) {
-			m_lightVertices[i].position = points[i];
-		}
-
-		auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
-		CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
-
-		UpdateBlurMask( pDevice, m_lightVertices );
-		return S_OK;
+	for ( size_t i{}; i < points.size(); ++i ) {
+		m_lightVertices[i].position = points[i];
 	}
 
-	return E_FAIL;
+	auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
+	CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+	if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
+		return E_FAIL;
+	}
+
+	m_linePointsCaches.clear();
+
+	return S_OK;
 }
 
 HRESULT _MutableLightImpl::AddLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t index, const D3DXVECTOR3& position )
@@ -688,6 +662,8 @@ HRESULT _MutableLightImpl::RemoveLightVertex( LPDIRECT3DDEVICE9 pDevice, size_t 
 	}
 
 	ClearEditingStates( points.size() );
+
+	m_linePointsCaches.clear();
 
 	return S_OK;
 }
@@ -796,7 +772,7 @@ D3DXVECTOR3 _MutableLightImpl::GetCenterPoint( _InIt _First, _InIt _Last ) const
 	return center;
 }
 
-HRESULT _MutableLightImpl::DrawVertexHelper( LPDIRECT3DDEVICE9 pDevice, D3DDISPLAYMODE const& displayMode, char const* windowTitleName )
+HRESULT _MutableLightImpl::DrawHelper( LPDIRECT3DDEVICE9 pDevice, D3DDISPLAYMODE const& displayMode, char const* windowTitleName )
 {
 	bool mouseHoveringNoWindow = true;
 
@@ -981,11 +957,12 @@ HRESULT _MutableLightImpl::DrawVertexHelper( LPDIRECT3DDEVICE9 pDevice, D3DDISPL
 				{
 					auto debugColor = IM_COL32( 0, 255, 0, 255 );
 					auto thickness = 1.f;
+					auto& points = cache.m_points;
 
-					for ( auto pointIndex = 0; pointIndex < linePoints.size(); ++pointIndex ) {
-						auto& pp0 = linePoints[pointIndex];
-						auto nextIndex = ( pointIndex + 1 ) % linePoints.size();
-						auto& pp1 = linePoints[nextIndex];
+					for ( size_t pointIndex{}; pointIndex < points.size(); ++pointIndex ) {
+						auto& pp0 = points[pointIndex];
+						auto nextIndex = ( pointIndex + 1 ) % points.size();
+						auto& pp1 = points[nextIndex];
 
 						drawList->AddLine( { pp0.x, pp0.y }, { pp1.x, pp1.y }, debugColor, thickness );
 					}
@@ -1060,13 +1037,38 @@ HRESULT _ImmutableFreeform<LIGHT_IMPL>::Draw( LPDIRECT3DDEVICE9 pDevice, float x
 			pDevice->SetTransform( D3DTS_VIEW, &view );
 		}
 
-		for ( auto& lightImpl : m_lightImpls ) {
-			if ( FAILED( lightImpl->Draw( pDevice ) ) ) {
-				ASSERT( FALSE );
+		DWORD curBlendOp = {};
+		DWORD curSrcBlend = {};
+		DWORD curDestBlend = {};
+		pDevice->GetRenderState( D3DRS_BLENDOP, &curBlendOp );
+		pDevice->GetRenderState( D3DRS_DESTBLEND, &curDestBlend );
+		pDevice->GetRenderState( D3DRS_SRCBLEND, &curSrcBlend );
+		DWORD fillMode{};
+		pDevice->GetRenderState( D3DRS_FILLMODE, &fillMode );
 
-				return E_FAIL;
+		DWORD oldFVF{};
+		pDevice->GetFVF( &oldFVF );
+
+		{
+			pDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
+			pDevice->SetRenderState( D3DRS_SRCBLEND, D3DBLEND_SRCALPHA );
+			pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_DESTALPHA );
+
+			for ( auto& lightImpl : m_lightImpls ) {
+				if ( FAILED( lightImpl->Draw( pDevice ) ) ) {
+					ASSERT( FALSE );
+
+					return E_FAIL;
+				}
 			}
 		}
+
+		pDevice->SetRenderState( D3DRS_BLENDOP, curBlendOp );
+		pDevice->SetRenderState( D3DRS_DESTBLEND, curDestBlend );
+		pDevice->SetRenderState( D3DRS_SRCBLEND, curSrcBlend );
+		pDevice->SetRenderState( D3DRS_FILLMODE, fillMode );
+
+		pDevice->SetFVF( oldFVF );
 
 		// 뷰 행렬 복원
 		pDevice->SetTransform( D3DTS_VIEW, &curVm );
@@ -1120,6 +1122,7 @@ HRESULT _MutableFreeform<void>::DrawImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCent
 				auto& tab = m_tabs[i];
 
 				if ( ImGui::BeginTabItem( tab.m_name.c_str(), &tab.m_opened, ImGuiTabItemFlags_None ) ) {
+					// 초점을 받은 탭 아이템
 					if ( tab.m_opened ) {
 						auto light = m_lightImpls[i];
 						auto newLightSetting = light->GetSetting();
@@ -1131,7 +1134,7 @@ HRESULT _MutableFreeform<void>::DrawImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCent
 
 						selectedLightIndex = i;
 					}
-					// 삭제
+					// 초점을 받지 못한 탭 아이템
 					else {
 						RemoveLight( i );
 					}
@@ -1156,7 +1159,7 @@ HRESULT _MutableFreeform<void>::DrawImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCent
 	if ( freeformLightVisible && m_setting.helper ) {
 		auto light = m_lightImpls[selectedLightIndex];
 
-		light->DrawVertexHelper( pDevice, m_displayMode, windowTitleName );
+		light->DrawHelper( pDevice, m_displayMode, windowTitleName );
 	}
 
 	return S_OK;
