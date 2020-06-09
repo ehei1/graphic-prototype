@@ -43,7 +43,7 @@ LPDIRECT3DTEXTURE9      g_pBackgroundTexture = NULL; // Our texture
 LPDIRECT3DTEXTURE9		g_pMainScreenTexture = NULL;
 LPD3DXMESH				g_pScreenMesh = NULL;
 LPDIRECT3DTEXTURE9		g_pScreenTexture = NULL;
-std::unique_ptr<_EditableFreeform> g_pFreemformLight = NULL;
+std::unique_ptr<MutableFreeform> g_pFreemformLight = NULL;
 const D3DDISPLAYMODE	gDisplayMode{ 1024, 768, 0, D3DFMT_A8R8G8B8 };
 float					gScale = 100;
 D3DXVECTOR2				gTranslation{};
@@ -122,7 +122,7 @@ HRESULT InitD3D( HWND hWnd )
 		}
 	}
 
-	g_pFreemformLight.reset( new _EditableFreeform{ g_pBlurPixelShader, gDisplayMode } );
+	g_pFreemformLight.reset( new MutableFreeform{ g_pBlurPixelShader, gDisplayMode } );
 
 	if ( FAILED( g_pd3dDevice->CreateTexture( gDisplayMode.Width, gDisplayMode.Height, 1, D3DUSAGE_RENDERTARGET, gDisplayMode.Format, D3DPOOL_DEFAULT, &g_pMainScreenTexture, NULL ) ) ) {
 		return E_FAIL;
@@ -350,7 +350,7 @@ VOID Render()
 			LPDIRECT3DSURFACE9 pScreenSurface{};
 			g_pScreenTexture->GetSurfaceLevel( 0, &pScreenSurface );
 
-			auto clearColor = g_pFreemformLight->GetSetting().ambient;
+			auto clearColor = g_pFreemformLight->GetAmbientColor();
 
 			LPDIRECT3DSURFACE9 curRT = {};
 			g_pd3dDevice->GetRenderTarget( 0, &curRT );
@@ -404,9 +404,7 @@ VOID Render()
 			D3DXMatrixTranslation( &tm, x, y, 0 );
 			g_pd3dDevice->SetTransform( D3DTS_WORLD, &tm );
 
-			auto& setting = g_pFreemformLight->GetSetting();
-
-			if ( !setting.maskVisible ) {
+			if ( g_pFreemformLight->IsMaskInvisible() ) {
 				// 마스크를 반전해서 게임 화면이 그려진 렌더타겟의 색깔과 곱한다
 				// result = src * 0 + dest * ( 1 - srcAlpha )
 				g_pd3dDevice->SetRenderState( D3DRS_BLENDOP, D3DBLENDOP_ADD );
@@ -566,7 +564,7 @@ INT WINAPI wWinMain( HINSTANCE hInst, HINSTANCE, LPWSTR, INT )
 				// Create ImGui widget
 				auto xCenter = gDisplayMode.Width / 2;
 				auto yCenter = gDisplayMode.Height / 2;
-				g_pFreemformLight->CreateImgui( g_pd3dDevice, xCenter, yCenter, true, &showWindow );
+				g_pFreemformLight->DrawImgui( g_pd3dDevice, xCenter, yCenter, true, &showWindow );
 
 				//ImGui::ShowDemoWindow();
 
