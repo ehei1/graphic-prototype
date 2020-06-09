@@ -23,20 +23,17 @@ protected:
 
 	struct Setting
 	{
-		D3DXCOLOR lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
-		D3DXCOLOR shadowColor = D3DCOLOR_XRGB( 255 / 2, 255 / 2, 255 / 2 );
-		float intensity = 1.f;
-		float falloff = 1.f;
+		D3DXCOLOR lightColor;
+		D3DXCOLOR shadowColor;
+		float intensity;
+		float falloff;
 	};
 
 public:
-	// TODO: setting을 입력받아야 함. 포인터 좌표 포함
-	_ImmutableLightImpl( LPDIRECT3DDEVICE9, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& );
+	_ImmutableLightImpl( LPDIRECT3DDEVICE9, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const&, Setting const& );
 	virtual ~_ImmutableLightImpl();
 
 	HRESULT Draw( LPDIRECT3DDEVICE9 );
-	// TODO 생성자에서 처리해야함
-	HRESULT UpdateLight( LPDIRECT3DDEVICE9, const Setting& );
 
 	static HRESULT CreateMesh( LPDIRECT3DDEVICE9, LPD3DXMESH*, UINT width, UINT height );
 	static HRESULT CreateTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9*, UINT width, UINT height );
@@ -59,7 +56,7 @@ protected:
 	HRESULT UpdateBlurMask( LPDIRECT3DDEVICE9, const Vertices& );
 
 protected:
-	// 개별 프리폼 조명 정보
+	// TODO: 버텍스 컬러로 그릴 수 없을까 엄청난 중복 발생
 	// 텍스처
 	LPDIRECT3DTEXTURE9 m_pLightTexture{};
 	// 버퍼
@@ -75,14 +72,17 @@ protected:
 	{
 		D3DXMATRIX m_worldTransform{};
 		LPDIRECT3DTEXTURE9 m_pTexture{};
+		LPD3DXMESH m_pMesh{};
+
+		~Mask()
+		{
+			SAFE_RELEASE( m_pTexture );
+			SAFE_RELEASE( m_pMesh );
+		}
 	}
 	m_blurMask;
 
-	// TODO: Mask 구조체에 처 넣기
-	LPD3DXMESH m_pMaskMesh{};
 	LPDIRECT3DPIXELSHADER9 m_pBlurPixelShader{};
-
-	Setting m_setting;
 };
 
 class _MutableLightImpl : public _ImmutableLightImpl
@@ -106,9 +106,10 @@ public:
 
 	inline void ClearEditingStates( size_t vertexCount ) { m_vertexEditingStates.clear(); m_vertexEditingStates.resize( vertexCount ); }
 
+	HRESULT UpdateLight( LPDIRECT3DDEVICE9, const Setting& );
+
 private:
 	// 정점을 편집한다
-	// TODO: seperate to _EditableLightImpl 
 	HRESULT UpdateLightVertex( LPDIRECT3DDEVICE9, WORD index, const D3DXVECTOR3& position );
 	HRESULT UpdateLightVertex( LPDIRECT3DDEVICE9, const Points& );
 	HRESULT AddLightVertex( LPDIRECT3DDEVICE9, size_t index, const D3DXVECTOR3& position );
@@ -124,6 +125,8 @@ private:
 
 	template<class _InIt>
 	D3DXVECTOR3 GetCenterPoint( _InIt _First, _InIt _Last ) const;
+
+	Setting GetDefaultSetting() const;
 
 private:
 	Setting m_setting;
@@ -189,7 +192,7 @@ public:
 	HRESULT DrawImgui( LPDIRECT3DDEVICE9, LONG xCenter, LONG yCenter, bool isAmbientMode, bool* pIsVisible );
 
 	inline bool IsMaskInvisible() const { return !m_setting.maskVisible; }
-	inline D3DXCOLOR GetAmbientColor() const { return m_setting.ambient;  }
+	inline D3DXCOLOR GetAmbientColor() const { return m_setting.ambient; }
 
 private:
 	HRESULT AddLight( LPDIRECT3DDEVICE9, LONG x, LONG y );

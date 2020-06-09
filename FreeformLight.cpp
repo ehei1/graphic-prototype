@@ -10,19 +10,20 @@
 //#define DEBUG_SURFACE
 
 
-_ImmutableLightImpl::_ImmutableLightImpl( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& points ) : m_pBlurPixelShader( pBlurShader )
+_ImmutableLightImpl::_ImmutableLightImpl( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& points, Setting const& setting ) :
+	m_pBlurPixelShader( pBlurShader )
 {
 	// TODO 메시로 바꾸기
 	ASSERT( pDevice );
-	
+
 	// 초기화
-	if ( FAILED( CreateLightTextureByLockRect( pDevice, &m_pLightTexture, m_setting ) ) ) {
+	if ( FAILED( CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting ) ) ) {
 		ASSERT( FALSE );
 
 		throw std::exception( "texture creation failed" );
 	}
 
-	if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, m_setting.falloff ) ) ) {
+	if ( FAILED( UpdateLightVertexBuffer( &m_pLightVertexBuffer, m_lightVertices, pDevice, points, setting.falloff ) ) ) {
 		throw std::exception( "vertext buffer updating failed" );
 	}
 	else if ( FAILED( UpdateLightIndexBuffer( &m_pLightIndexBuffer, m_lightIndices, pDevice, points.size() ) ) ) {
@@ -39,40 +40,6 @@ _ImmutableLightImpl::~_ImmutableLightImpl()
 	SAFE_RELEASE( m_pLightTexture );
 	SAFE_RELEASE( m_pLightIndexBuffer );
 	SAFE_RELEASE( m_pLightVertexBuffer );
-	SAFE_RELEASE( m_pMaskMesh );
-	SAFE_RELEASE( m_blurMask.m_pTexture );
-}
-
-HRESULT _ImmutableLightImpl::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& setting )
-{
-	// 텍스처 수정
-	if ( m_pLightTexture && ( m_setting.lightColor != setting.lightColor || m_setting.intensity != setting.intensity ) ) {
-		SAFE_RELEASE( m_pLightTexture );
-
-		CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting );
-		UpdateBlurMask( pDevice, m_lightVertices );
-	}
-
-	// uv 수정
-	if ( m_setting.falloff != setting.falloff ) {
-		auto falloff = setting.falloff;
-
-		if ( !m_lightVertices.empty() ) {
-			m_lightVertices[0].uv = { falloff, falloff };
-
-			auto updateFalloff = [i = -1, falloff]( CUSTOM_VERTEX& customVertex ) mutable {
-				customVertex.uv = ( ++i % 2 ? D3DXVECTOR2{ falloff, 0 } : D3DXVECTOR2{ 0, 0 } );
-			};
-			std::for_each( std::next( std::begin( m_lightVertices ) ), std::end( m_lightVertices ), updateFalloff );
-
-			auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
-			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
-
-			UpdateBlurMask( pDevice, m_lightVertices );
-		}
-	}
-
-	return S_OK;
 }
 
 HRESULT _ImmutableLightImpl::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture ) const
@@ -89,8 +56,8 @@ HRESULT _ImmutableLightImpl::CreateLightTextureByRenderer( LPDIRECT3DDEVICE9 pDe
 	} customVertices[] = {
 		{ { 0.f, 0.f, 0.f, 1.f }, 0xffffffff, },
 		{ { 0.f,   y, 0.f, 1.f }, 0xff000000, },
-		{ { x,   y, 0.f, 1.f }, 0xff000000, },
-		{ { x, 0.f, 0.f, 1.f }, 0xffffffff, },
+		{ { x,     y, 0.f, 1.f }, 0xff000000, },
+		{ { x,   0.f, 0.f, 1.f }, 0xffffffff, },
 	};
 	constexpr auto textureFVF = D3DFVF_XYZRHW | D3DFVF_DIFFUSE;
 	LPDIRECT3DVERTEXBUFFER9 pVertexBuffer = {};
@@ -315,8 +282,8 @@ HRESULT _ImmutableLightImpl::UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* p
 // TODO: use async
 HRESULT _ImmutableLightImpl::UpdateBlurMask( LPDIRECT3DDEVICE9 pDevice, const Vertices& vertices )
 {
-	if ( !m_pMaskMesh ) {
-		if ( FAILED( CreateMesh( pDevice, &m_pMaskMesh, 1, 1 ) ) ) {
+	if ( !m_blurMask.m_pMesh ) {
+		if ( FAILED( CreateMesh( pDevice, &m_blurMask.m_pMesh, 1, 1 ) ) ) {
 			return E_FAIL;
 		}
 	}
@@ -576,8 +543,8 @@ HRESULT _ImmutableLightImpl::Draw( LPDIRECT3DDEVICE9 pDevice )
 		pDevice->SetRenderState( D3DRS_DESTBLEND, D3DBLEND_INVSRCALPHA );
 
 		pDevice->SetTexture( 0, m_blurMask.m_pTexture );
-		pDevice->SetFVF( m_pMaskMesh->GetFVF() );
-		m_pMaskMesh->DrawSubset( 0 );
+		pDevice->SetFVF( m_blurMask.m_pMesh->GetFVF() );
+		m_blurMask.m_pMesh->DrawSubset( 0 );
 
 		pDevice->EndScene();
 
@@ -594,7 +561,7 @@ HRESULT _ImmutableLightImpl::Draw( LPDIRECT3DDEVICE9 pDevice )
 	return S_OK;
 }
 
-_MutableLightImpl::_MutableLightImpl( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& points ) : _ImmutableLightImpl{ pDevice, pBlurShader, points }
+_MutableLightImpl::_MutableLightImpl( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& points ) : _ImmutableLightImpl { pDevice, pBlurShader, points, GetDefaultSetting() }, m_setting{ GetDefaultSetting() }
 {
 	ClearEditingStates( points.size() );
 }
@@ -1031,6 +998,49 @@ HRESULT _MutableLightImpl::DrawVertexHelper( LPDIRECT3DDEVICE9 pDevice, D3DDISPL
 	return S_OK;
 }
 
+HRESULT _MutableLightImpl::UpdateLight( LPDIRECT3DDEVICE9 pDevice, const Setting& setting )
+{
+	// 텍스처 수정
+	if ( m_pLightTexture && ( m_setting.lightColor != setting.lightColor || m_setting.intensity != setting.intensity ) ) {
+		SAFE_RELEASE( m_pLightTexture );
+
+		CreateLightTextureByLockRect( pDevice, &m_pLightTexture, setting );
+		UpdateBlurMask( pDevice, m_lightVertices );
+	}
+
+	// uv 수정
+	if ( m_setting.falloff != setting.falloff ) {
+		auto falloff = setting.falloff;
+
+		if ( !m_lightVertices.empty() ) {
+			m_lightVertices[0].uv = { falloff, falloff };
+
+			auto updateFalloff = [i = -1, falloff]( CUSTOM_VERTEX& customVertex ) mutable {
+				customVertex.uv = ( ++i % 2 ? D3DXVECTOR2{ falloff, 0 } : D3DXVECTOR2{ 0, 0 } );
+			};
+			std::for_each( std::next( std::begin( m_lightVertices ) ), std::end( m_lightVertices ), updateFalloff );
+
+			auto memorySize = static_cast<UINT>( m_lightVertices.size() * sizeof( Vertices::value_type ) );
+			CopyToMemory( m_pLightVertexBuffer, m_lightVertices.data(), memorySize );
+
+			UpdateBlurMask( pDevice, m_lightVertices );
+		}
+	}
+
+	return S_OK;
+}
+
+_MutableLightImpl::Setting _MutableLightImpl::GetDefaultSetting() const
+{
+	Setting setting;
+	setting.lightColor = D3DCOLOR_XRGB( 255, 255, 255 );
+	setting.shadowColor = D3DCOLOR_XRGB( 255 / 2, 255 / 2, 255 / 2 );
+	setting.intensity = 0.5f;
+	setting.falloff = 2.f;
+
+	return setting;
+}
+
 template<typename LIGHT_IMPL>
 HRESULT _ImmutableFreeform<LIGHT_IMPL>::Draw( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 {
@@ -1127,6 +1137,11 @@ HRESULT _MutableFreeform<void>::DrawImgui( LPDIRECT3DDEVICE9 pDevice, LONG xCent
 					}
 
 					ImGui::EndTabItem();
+				}
+				else {
+					if ( !tab.m_opened ) {
+						RemoveLight( i );
+					}
 				}
 			}
 
