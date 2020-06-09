@@ -8,14 +8,14 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{a8c6343e-47ba-4c9f-9bc6-f980078800af}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Light">
-      <UniqueIdentifier>{78844a5d-1b53-47d9-b8e0-91b437f590f1}</UniqueIdentifier>
-    </Filter>
     <Filter Include="imgui\DirectX 9">
       <UniqueIdentifier>{200c07cb-b760-477d-a493-f9f62ec6c113}</UniqueIdentifier>
     </Filter>
     <Filter Include="HLSL">
       <UniqueIdentifier>{86b1fa91-3f84-4e9c-926e-ac445f476805}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="FreeformLight">
+      <UniqueIdentifier>{35fef8c3-c96f-4d69-8310-56d277713869}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -25,9 +25,6 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="StdAfx.cpp" />
-    <ClCompile Include="FreeformLight.cpp">
-      <Filter>Light</Filter>
-    </ClCompile>
     <ClCompile Include="main.cpp" />
     <ClCompile Include="imgui\imgui.cpp">
       <Filter>imgui</Filter>
@@ -47,12 +44,18 @@
     <ClCompile Include="imgui\examples\imgui_impl_win32.cpp">
       <Filter>imgui\DirectX 9</Filter>
     </ClCompile>
+    <ClCompile Include="FreeformLight\_ImmutableLightImpl.cpp">
+      <Filter>FreeformLight</Filter>
+    </ClCompile>
+    <ClCompile Include="FreeformLight\_MutableLightImpl.cpp">
+      <Filter>FreeformLight</Filter>
+    </ClCompile>
+    <ClCompile Include="FreeformLight\_MutableFreeform.cpp">
+      <Filter>FreeformLight</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="StdAfx.h" />
-    <ClInclude Include="FreeformLight.h">
-      <Filter>Light</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imconfig.h">
       <Filter>imgui</Filter>
     </ClInclude>
@@ -76,6 +79,27 @@
     </ClInclude>
     <ClInclude Include="imgui\examples\imgui_impl_win32.h">
       <Filter>imgui\DirectX 9</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\_ImmutableLightImpl.h">
+      <Filter>FreeformLight</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\_MutableLightImpl.h">
+      <Filter>FreeformLight</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\_FreeformImpl.h">
+      <Filter>FreeformLight</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\_ImmutableFreeform.h">
+      <Filter>FreeformLight</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\_MutableFreeform.h">
+      <Filter>FreeformLight</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\_debug.h">
+      <Filter>FreeformLight</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeformLight\light.h">
+      <Filter>FreeformLight</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
