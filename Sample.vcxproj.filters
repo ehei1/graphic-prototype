@@ -95,9 +95,6 @@
     <ClInclude Include="FreeformLight\_MutableFreeform.h">
       <Filter>FreeformLight</Filter>
     </ClInclude>
-    <ClInclude Include="FreeformLight\_debug.h">
-      <Filter>FreeformLight</Filter>
-    </ClInclude>
     <ClInclude Include="FreeformLight\light.h">
       <Filter>FreeformLight</Filter>
     </ClInclude>

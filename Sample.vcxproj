@@ -401,7 +401,6 @@
     </FxCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="FreeformLight\_debug.h" />
     <ClInclude Include="FreeformLight\light.h" />
     <ClInclude Include="FreeformLight\_FreeformImpl.h" />
     <ClInclude Include="FreeformLight\_ImmutableFreeform.h" />

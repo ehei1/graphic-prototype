@@ -1,6 +1,7 @@
 #include "stdafx.h"
-#include "_debug.h"
 #include "_ImmutableLightImpl.h"
+
+//#define DEBUG_SURFACE
 
 
 namespace FreeformLight
@@ -226,16 +227,6 @@ namespace FreeformLight
 		};
 		std::transform( std::cbegin( points ), std::cend( points ), std::back_inserter( vertices ), updateVertex );
 		vertices[0].uv = { falloff, falloff };
-
-#ifdef DEBUG_LINE
-		auto debugPosition = []( const CUSTOM_VERTEX& vertex ) {
-			auto& position = vertex.position;
-			TCHAR debugText[MAX_PATH] = {};
-			_stprintf_s( debugText, _countof( debugText ), TEXT( "%f,%f,%f\n" ), position.x, position.y, position.z );
-			OutputDebugString( debugText );
-		};
-		std::for_each( vertices.begin(), vertices.end(), debugPosition );
-#endif
 
 		auto verticesSize = sizeof( Vertices::value_type ) * vertices.size();
 		LPDIRECT3DVERTEXBUFFER9 pVertexBuffer{};

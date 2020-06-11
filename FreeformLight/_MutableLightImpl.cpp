@@ -1,7 +1,9 @@
 #include "stdafx.h"
 #include <string>
-#include "_debug.h"
 #include "_MutableLightImpl.h"
+
+//#define DEBUG_LINE
+//#define DEBUG_BLUR_MASK
 
 
 namespace FreeformLight
@@ -404,13 +406,13 @@ namespace FreeformLight
 						D3DXVECTOR4 rotatedDirection{};
 						D3DXVec3Transform( &rotatedDirection, &direction, &rotationMatrix );
 
-						auto offset = 20.f;
+						auto offset = 30.f;
 						auto directionOffset = direction * offset;
 						auto _from = from + directionOffset;
 						auto _to = to - directionOffset;
 
 						auto width = 10.f;
-						auto xBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y,{} } *width;
+						auto xBias = D3DXVECTOR3{ rotatedDirection.x, rotatedDirection.y,{} } * width;
 						auto p0 = _from + xBias;
 						auto p1 = _from - xBias;
 						auto p2 = _to - xBias;
@@ -434,9 +436,9 @@ namespace FreeformLight
 #ifdef DEBUG_LINE
 							drawList->AddCircle( { crossPoint.x, crossPoint.y }, 50, IM_COL32( 0, 255, 0, 255 ) );
 #endif
-							constexpr auto controlOffset = 5;
+							constexpr auto controlOffset = -10.f;
 
-							ImGui::SetNextWindowPos( { crossPoint.x - controlOffset, crossPoint.y - controlOffset } );
+							ImGui::SetNextWindowPos( { mousePos.x + controlOffset, mousePos.y + controlOffset } );
 							ImGui::Begin( ".", nullptr, ImGuiWindowFlags_NoDecoration );
 							auto pushed = ImGui::Button( "o" );
 							ImGui::End();
