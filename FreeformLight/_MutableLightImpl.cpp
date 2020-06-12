@@ -30,8 +30,6 @@ namespace FreeformLight
 			if ( updatingIndex == index ) {
 				m_lightVertices[index].position = position;
 
-				// 지렛대의 원리로 찾는 중점
-				// https://blog.naver.com/dbtkdwh0/90085488219
 				// 중점 수정이 아니면 자동으로 설정해준다
 				if ( updatingIndex )
 				{
@@ -168,7 +166,7 @@ namespace FreeformLight
 	}
 
 	// 주어진 두 선과의 y 축 간의 교점을 얻는다
-	bool _MutableLightImpl::GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR3 p1, const D3DXVECTOR2& mousePosition, D3DDISPLAYMODE const& displayMode ) const
+	bool _MutableLightImpl::GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR3 p1, const D3DXVECTOR2& mousePosition, D3DDISPLAYMODE const& displayMode )
 	{
 		using _PointPair = std::pair<D3DXVECTOR2, D3DXVECTOR2>;
 		using _LinePoints = std::initializer_list<_PointPair>;
@@ -222,6 +220,11 @@ namespace FreeformLight
 		return points;
 	}
 
+
+	/*
+	지렛대의 원리로 찾는 중점
+	https://blog.naver.com/dbtkdwh0/90085488219
+	*/
 	template<class _InIt>
 	D3DXVECTOR3 _MutableLightImpl::GetCenterPoint( _InIt _First, _InIt _Last ) const
 	{

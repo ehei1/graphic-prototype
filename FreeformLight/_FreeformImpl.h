@@ -2,20 +2,23 @@
 #include <d3dx9.h>
 
 
+/*
+조명 컨테이너의 공통 구현
+
+조명을 컨테이너 내에 생성하고 그린다
+*/
 namespace FreeformLight
 {
 	template<typename LIGHT_IMPL>
 	class _FreeformImpl
 	{
 	public:
-		explicit _FreeformImpl( LPDIRECT3DPIXELSHADER9 pBlurShader ) : m_pBlurPixelShader{ pBlurShader }
-		{}
-		_FreeformImpl( _FreeformImpl& ) = delete;
+		_FreeformImpl( const _FreeformImpl& ) = delete;
 
-		inline void SetBlurPixelShader( LPDIRECT3DPIXELSHADER9 shader ) { m_pBlurPixelShader = shader; }
-
+		// 컨테이너 내에 조명이 있는지 알려준다
 		inline bool HasLight() const { return !m_lightImpls.empty(); }
 
+		// 모든 조명을 그린다. 현재 설정된 LPDIRECT3DSURFACE9에 그린다
 		HRESULT Draw( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 		{
 			if ( m_lightImpls.size() ) {
@@ -74,6 +77,7 @@ namespace FreeformLight
 			return S_OK;
 		}
 
+		// 장치가 복구될 때 호출된다
 		virtual HRESULT RestoreDevice( LPDIRECT3DDEVICE9 pDevice, D3DDISPLAYMODE const& )
 		{
 			for ( auto&& lightImpl : m_lightImpls ) {
@@ -87,12 +91,17 @@ namespace FreeformLight
 			return S_OK;
 		}
 
+		// 장치가 무효화될 때 호출된다
 		void Invalidate()
 		{
 			for ( auto&& lightImpl : m_lightImpls ) {
 				lightImpl->Invalidate();
 			}
 		}
+
+	protected:
+		explicit _FreeformImpl( LPDIRECT3DPIXELSHADER9 pBlurShader ) : m_pBlurPixelShader{ pBlurShader }
+		{}
 
 	protected:
 		std::vector<std::shared_ptr<LIGHT_IMPL>> m_lightImpls;

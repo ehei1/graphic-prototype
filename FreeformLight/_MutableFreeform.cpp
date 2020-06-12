@@ -110,7 +110,7 @@ namespace FreeformLight
 	{
 		if ( m_lightImpls.size() > index ) {
 			{
-				auto iterator = std::next( std::cbegin( m_lightImpls ), index );
+				auto iterator = std::next( std::begin( m_lightImpls ), index );
 				m_lightImpls.erase( iterator );
 			}
 
@@ -131,10 +131,10 @@ namespace FreeformLight
 	_MutableLightImpl::Points _MutableFreeform::GetDefaultPoints( D3DDISPLAYMODE const& displayMode, LONG x, LONG y ) const
 	{
 		_MutableLightImpl::Points points{ { {},{},{} } };
-		// 화면의 절반만 차지하도록 한다
 		auto scaledWidth = displayMode.Width / 4;
 		auto scaledHeight = displayMode.Height / 4;
 
+		// 정점
 		auto leftTopPoints = { D3DXVECTOR3{ -1.0f, -1.0f, 0.f } };
 		auto rightTopPoints = { D3DXVECTOR3{ 1.0f, -1.0f, 0.f } };
 		auto rightBottomPoints = { D3DXVECTOR3{ 1.0f, 1.0f, 0.f } };

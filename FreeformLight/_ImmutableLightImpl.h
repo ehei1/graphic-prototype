@@ -30,13 +30,15 @@ namespace FreeformLight
 	public:
 		_ImmutableLightImpl( LPDIRECT3DDEVICE9, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const&, Setting const& );
 		virtual ~_ImmutableLightImpl();
-
+		// 조명을 그린다
 		virtual HRESULT Draw( LPDIRECT3DDEVICE9 );
-
+		// 메시를 만든다
 		static HRESULT CreateMesh( LPDIRECT3DDEVICE9, LPD3DXMESH*, UINT width, UINT height );
+		// 텍스처를 만든다
 		static HRESULT CreateTexture( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9*, UINT width, UINT height );
-
+		// 장치를 복구할 때 호출된다
 		HRESULT RestoreDevice( LPDIRECT3DDEVICE9 );
+		// 장치가 무효화될 때 호출된다
 		void Invalidate();
 
 	protected:
@@ -47,31 +49,34 @@ namespace FreeformLight
 		HRESULT CreateLightTextureByRenderer( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture ) const;
 		// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
 		HRESULT CreateLightTextureByLockRect( LPDIRECT3DDEVICE9, LPDIRECT3DTEXTURE9* pTexture, const Setting& ) const;
-
-		HRESULT CopyToMemory( LPDIRECT3DVERTEXBUFFER9 pDest, LPVOID pSrc, UINT size ) const;
+		// 조명을 그릴 때 쓰는 버텍스 버퍼를 갱신한다
 		HRESULT UpdateLightVertexBuffer( LPDIRECT3DVERTEXBUFFER9* pOut, Vertices& vertices, LPDIRECT3DDEVICE9 pDevice, const Points& points, float falloff );
-		// 인덱스 버퍼를 갱신한다
+		// 조명을 그릴 때 쓰는 인덱스 버퍼를 갱신한다
 		HRESULT UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, Indices& indices, LPDIRECT3DDEVICE9, size_t vertexSize ) const;
-
+		// 버텍스 버퍼에 자료를 복사한다
+		HRESULT CopyToMemory( LPDIRECT3DVERTEXBUFFER9 pDest, LPVOID pSrc, UINT size ) const;
 		// 블러 처리할 마스크를 만든다
 		HRESULT UpdateBlurMask( LPDIRECT3DDEVICE9, const Vertices& );
 
+	private:
+		// 렌더링 가능한 상태로 바꾼다
 		HRESULT ReadyToRender( LPDIRECT3DDEVICE9 );
 
 	protected:
-		// TODO: 버텍스 컬러로 그릴 수 없을까 엄청난 중복 발생
 		// 텍스처
 		LPDIRECT3DTEXTURE9 m_pLightTexture{};
 		// 버퍼
 		LPDIRECT3DINDEXBUFFER9 m_pLightIndexBuffer{};
 		LPDIRECT3DVERTEXBUFFER9 m_pLightVertexBuffer{};
 
-		const int m_lightVertexFvf = D3DFVF_XYZ | D3DFVF_TEX1;
-
 		Indices m_lightIndices;
 		Vertices m_lightVertices;
-		Points const m_points;
 		Setting m_setting;
+
+	private:
+		const int m_lightVertexFvf = D3DFVF_XYZ | D3DFVF_TEX1;
+
+		Points const m_points;
 
 		struct Mask
 		{
