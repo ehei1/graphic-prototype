@@ -104,7 +104,7 @@ CV__DNN_INLINE_NS_BEGIN
         h_t &= o_t \odot tanh(c_t),               \\
         c_t &= f_t \odot c_{t-1} + i_t \odot g_t, \\
         @f}
-        where @f$\odot@f$ is per-element multiply operation and @f$i_t, f_t, o_t, g_t@f$ is internal gates that are computed using learned wights.
+        where @f$\odot@f$ is per-element multiply operation and @f$i_t, f_t, o_t, g_t@f$ is internal gates that are computed using learned weights.
 
         Gates are computed as follows:
         @f{eqnarray*}{
@@ -462,6 +462,18 @@ CV__DNN_INLINE_NS_BEGIN
         static Ptr<TanHLayer> create(const LayerParams &params);
     };
 
+    class CV_EXPORTS SwishLayer : public ActivationLayer
+    {
+    public:
+        static Ptr<SwishLayer> create(const LayerParams &params);
+    };
+
+    class CV_EXPORTS MishLayer : public ActivationLayer
+    {
+    public:
+        static Ptr<MishLayer> create(const LayerParams &params);
+    };
+
     class CV_EXPORTS SigmoidLayer : public ActivationLayer
     {
     public:
@@ -496,6 +508,13 @@ CV__DNN_INLINE_NS_BEGIN
         static Ptr<Layer> create(const LayerParams &params);
     };
 
+    /** @brief Element wise operation on inputs
+
+    Extra optional parameters:
+    - "operation" as string. Values are "sum" (default), "prod", "max", "div"
+    - "coeff" as float array. Specify weights of inputs for SUM operation
+    - "output_channels_mode" as string. Values are "same" (default, all input must have the same layout), "input_0", "input_0_truncate", "max_input_channels"
+    */
     class CV_EXPORTS EltwiseLayer : public Layer
     {
     public:

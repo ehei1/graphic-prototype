@@ -2753,8 +2753,6 @@ int w2xconv_convert_memory
 
 	w2xconv_convert_mat( conv, &dst_mat, &src_mat, denoise_level, scale, block_size, { 1, 1, 1 }, has_alpha, has_alpha );
 
-	cv::imwrite("D:\\study\\b01s.waifu.png", dst_mat);
-
 	//cv::imshow( "texture", dst_mat );
 	//cv::waitKey( 0 );
 	//cv::destroyAllWindows();

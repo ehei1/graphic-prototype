@@ -1,13 +1,19 @@
 #include "stdafx.h"
 
 #include <cassert>
+#include <chrono>
 #include <string>
+
+#include <Shlwapi.h>
+
 #define HAVE_OPENCV
 #include "waifu2x\include\opencv2\core\hal\interface.h"
 
 #include "DirectXTex\DirectXTex.h"
 #include "waifu2x\src\w2xconv.h"
 #include "ImageFilter.h"
+
+
 
 
 namespace DotEngine
@@ -20,7 +26,13 @@ namespace DotEngine
 	public:
 		Waifu2xFilterImpl::Waifu2xFilterImpl() : _converter{ w2xconv_init(W2XConvGPUMode::W2XCONV_GPU_AUTO, 1, 0) }
 		{
-			if (auto error = w2xconv_load_model(_denoise_level, _converter, TEXT(".\\models_rgb"))) {
+			TCHAR filePath[MAX_PATH]{};
+			GetModuleFileName(NULL, filePath, _countof(filePath));
+
+			PathRemoveFileSpec(filePath);
+			PathAppend(filePath, TEXT("models_rgb"));
+
+			if (auto error = w2xconv_load_model(_denoise_level, _converter, filePath)) {
 				assert(false);
 
 				_check_for_errors(_converter, error);
@@ -71,7 +83,67 @@ namespace DotEngine
 		_impl.reset();
 	}
 
-	HRESULT ImageFilter::applyWaifu2x(LPVOID pBits, size_t width, size_t height, D3DFORMAT imageFormat) const
+	HRESULT ImageFilter::applyWaifu2x(const D3DLOCKED_RECT& srcLockedRect, D3DLOCKED_RECT& dstLockedRect, size_t width, size_t height, D3DFORMAT imageFormat) const
+	{
+		bool has_alpha{};
+
+		switch (imageFormat) {
+		case D3DFMT_A4R4G4B4:
+			has_alpha = true;
+		case D3DFMT_X4R4G4B4:
+			{
+				auto getTime = []() {
+					return std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch());
+				};
+				auto oldTime = getTime();
+
+				// 32bpp 그림으로 바꾸기 위해 담는다
+				DirectX::ScratchImage highColorImage;
+				highColorImage.Initialize2D(DXGI_FORMAT_B4G4R4A4_UNORM, width, height, 1, 1);
+
+				static_assert(sizeof(WORD) == 2, "invalid size");
+
+				copyFromSurfaceMemory(highColorImage.GetPixels(), srcLockedRect.pBits, width, height, srcLockedRect.Pitch, 16);
+
+				//DirectX::SaveToDDSFile(*highColorImage.GetImage(0, 0, 0), 0, std::wstring(L"D:\\study\\im.high.dds").c_str());
+
+				auto format = (has_alpha ? DXGI_FORMAT_B8G8R8A8_UNORM : DXGI_FORMAT_B8G8R8X8_UNORM);
+				DirectX::ScratchImage trueColorImage;
+
+				// 트루 컬러 그림으로 바꾼다
+				if (FAILED(DirectX::Convert(highColorImage.GetImages(), highColorImage.GetImageCount(), highColorImage.GetMetadata(), format, DirectX::TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, trueColorImage))) {
+					assert(false);
+					return E_FAIL;
+				}
+
+				auto curTime = getTime();
+				auto conversionTime = curTime - oldTime;
+
+				//DirectX::SaveToDDSFile(*trueColorImage.GetImage(0, 0, 0), 0, std::wstring(L"D:\\study\\im.true.dds").c_str());
+
+				if (FAILED(_impl->filter(trueColorImage.GetPixels(), width, height, has_alpha))) {
+					return E_FAIL;
+				}
+
+				auto filteringTime = getTime() - curTime;
+
+				copyToSurfaceMemory(dstLockedRect.pBits, trueColorImage.GetPixels(), width, height, dstLockedRect.Pitch, 32);
+
+				std::string name = std::to_string(width) + "x" + std::to_string(height);
+				std::string log = name + "\t" + std::to_string(conversionTime.count()) + "\t" + std::to_string(filteringTime.count()) + "\n";
+
+				OutputDebugString(log.c_str());
+				break;
+			}
+		}
+		
+		// format
+		// width x height	convert		filter
+
+		return S_OK;
+	}
+
+	HRESULT ImageFilter::applyWaifu2x(D3DLOCKED_RECT& lockedRect, size_t width, size_t height, D3DFORMAT imageFormat) const
 	{
 		bool has_alpha{};
 
@@ -83,7 +155,8 @@ namespace DotEngine
 				// 32bpp 그림으로 바꾸기 위해 담는다
 				DirectX::ScratchImage highColorImage;
 				highColorImage.Initialize2D(DXGI_FORMAT_B4G4R4A4_UNORM, width, height, 1, 1);
-				memcpy(highColorImage.GetPixels(), pBits, highColorImage.GetPixelsSize());
+
+				copyFromSurfaceMemory(highColorImage.GetPixels(), lockedRect.pBits, width, height, lockedRect.Pitch, 16);
 
 				auto format = (has_alpha ? DXGI_FORMAT_B8G8R8A8_UNORM : DXGI_FORMAT_B8G8R8X8_UNORM);
 				DirectX::ScratchImage trueColorImage;
@@ -103,8 +176,7 @@ namespace DotEngine
 					return E_FAIL;
 				}
 
-				memcpy(pBits, highColorImage.GetPixels(), highColorImage.GetPixelsSize());
-				break;
+				copyToSurfaceMemory(lockedRect.pBits, trueColorImage.GetPixels(), width, height, lockedRect.Pitch, 16);
 			}
 			// 32bpp 그림은 디더링되지 않은 것으로 간주하고 필터 처리도 하지 않는다
 		case D3DFMT_A8R8G8B8:
@@ -116,5 +188,33 @@ namespace DotEngine
 		}
 
 		return S_OK;
+	}
+
+	void ImageFilter::copyFromSurfaceMemory(LPVOID pDst, LPVOID pSrc, size_t width, size_t height, UINT pitch, UINT bitPerPixel) const
+	{
+		auto byteSize = bitPerPixel / 8;
+		auto recordSize = byteSize * width;
+
+		assert(pitch >= recordSize);
+
+		for (UINT i{}; i < height; ++i) {
+			LPVOID pData = static_cast<LPBYTE>(pSrc) + pitch * i;
+
+			memcpy(reinterpret_cast<LPBYTE>(pDst) + recordSize * i, pData, recordSize);
+		}
+	}
+
+	void ImageFilter::copyToSurfaceMemory(LPVOID pDst, LPVOID pSrc, size_t width, size_t height, UINT pitch, UINT bitPerPixel) const
+	{
+		auto byteSize = bitPerPixel / 8;
+		auto recordSize = byteSize * width;
+
+		assert(pitch >= recordSize);
+
+		for (UINT i{}; i < height; ++i) {
+			LPVOID pData = static_cast<LPBYTE>(pDst) + recordSize * i;
+
+			memcpy(pData, static_cast<LPBYTE>(pSrc) + recordSize * i, recordSize);
+		}
 	}
 }

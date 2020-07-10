@@ -357,29 +357,6 @@ namespace DirectX
     HRESULT __cdecl SaveToTGAMemory( _In_ const Image& image, _Out_ Blob& blob );
     HRESULT __cdecl SaveToTGAFile( _In_ const Image& image, _In_z_ const wchar_t* szFile );
 
-    // WIC operations
-    HRESULT __cdecl LoadFromWICMemory( _In_reads_bytes_(size) const void* pSource, _In_ size_t size, _In_ DWORD flags,
-                                       _Out_opt_ TexMetadata* metadata, _Out_ ScratchImage& image,
-                                       _In_opt_ std::function<void __cdecl(IWICMetadataQueryReader*)> getMQR = nullptr);
-    HRESULT __cdecl LoadFromWICFile( _In_z_ const wchar_t* szFile, _In_ DWORD flags,
-                                    _Out_opt_ TexMetadata* metadata, _Out_ ScratchImage& image,
-                                    _In_opt_ std::function<void __cdecl(IWICMetadataQueryReader*)> getMQR = nullptr);
-
-    HRESULT __cdecl SaveToWICMemory( _In_ const Image& image, _In_ DWORD flags, _In_ REFGUID guidContainerFormat,
-                                     _Out_ Blob& blob, _In_opt_ const GUID* targetFormat = nullptr,
-                                     _In_opt_ std::function<void __cdecl(IPropertyBag2*)> setCustomProps = nullptr );
-    HRESULT __cdecl SaveToWICMemory( _In_count_(nimages) const Image* images, _In_ size_t nimages, _In_ DWORD flags, _In_ REFGUID guidContainerFormat,
-                                     _Out_ Blob& blob, _In_opt_ const GUID* targetFormat = nullptr,
-                                     _In_opt_ std::function<void __cdecl(IPropertyBag2*)> setCustomProps = nullptr );
-
-    HRESULT __cdecl SaveToWICFile( _In_ const Image& image, _In_ DWORD flags, _In_ REFGUID guidContainerFormat,
-                                   _In_z_ const wchar_t* szFile, _In_opt_ const GUID* targetFormat = nullptr,
-                                   _In_opt_ std::function<void __cdecl(IPropertyBag2*)> setCustomProps = nullptr );
-    HRESULT __cdecl SaveToWICFile( _In_count_(nimages) const Image* images, _In_ size_t nimages, _In_ DWORD flags, _In_ REFGUID guidContainerFormat,
-                                   _In_z_ const wchar_t* szFile, _In_opt_ const GUID* targetFormat = nullptr,
-                                   _In_opt_ std::function<void __cdecl(IPropertyBag2*)> setCustomProps = nullptr );
-
-    //---------------------------------------------------------------------------------
     // Texture conversion, resizing, mipmap generation, and block compression
 
     enum TEX_FR_FLAGS

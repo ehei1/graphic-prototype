@@ -74,7 +74,6 @@ namespace
     };
 
     bool g_WIC2 = false;
-    IWICImagingFactory* g_Factory = nullptr;
 }
 
 
@@ -90,14 +89,6 @@ DXGI_FORMAT DirectX::_WICToDXGI(const GUID& guid)
         if (memcmp(&g_WICFormats[i].wic, &guid, sizeof(GUID)) == 0)
             return g_WICFormats[i].format;
     }
-
-#if (_WIN32_WINNT >= _WIN32_WINNT_WIN8) || defined(_WIN7_PLATFORM_UPDATE)
-    if (g_WIC2)
-    {
-        if (memcmp(&GUID_WICPixelFormat96bppRGBFloat, &guid, sizeof(GUID)) == 0)
-            return DXGI_FORMAT_R32G32B32_FLOAT;
-    }
-#endif
 
     return DXGI_FORMAT_UNKNOWN;
 }
@@ -136,16 +127,6 @@ bool DirectX::_DXGIToWIC( DXGI_FORMAT format, GUID& guid, bool ignoreRGBvsBGR )
     case DXGI_FORMAT_B8G8R8X8_UNORM_SRGB:
         memcpy( &guid, &GUID_WICPixelFormat32bppBGR, sizeof(GUID) );
         return true;
-
-#if (_WIN32_WINNT >= _WIN32_WINNT_WIN8) || defined(_WIN7_PLATFORM_UPDATE)
-    case DXGI_FORMAT_R32G32B32_FLOAT:
-        if ( g_WIC2 )
-        {
-            memcpy( &guid, &GUID_WICPixelFormat96bppRGBFloat, sizeof(GUID) );
-            return true;
-        }
-        break;
-#endif
 
     default:
         for( size_t i=0; i < _countof(g_WICFormats); ++i )
@@ -231,59 +212,9 @@ REFGUID DirectX::GetWICCodec(WICCodecs codec)
 //-------------------------------------------------------------------------------------
 IWICImagingFactory* DirectX::GetWICFactory(bool& iswic2)
 {
-    if (g_Factory)
-    {
-        iswic2 = g_WIC2;
-        return g_Factory;
-    }
+	assert(FALSE);
 
-    static INIT_ONCE s_initOnce = INIT_ONCE_STATIC_INIT;
-
-    InitOnceExecuteOnce(&s_initOnce,
-        [](PINIT_ONCE, PVOID, LPVOID *factory) -> BOOL
-    {
-#if (_WIN32_WINNT >= _WIN32_WINNT_WIN8) || defined(_WIN7_PLATFORM_UPDATE)
-        HRESULT hr = CoCreateInstance(
-            CLSID_WICImagingFactory2,
-            nullptr,
-            CLSCTX_INPROC_SERVER,
-            __uuidof(IWICImagingFactory2),
-            factory
-        );
-
-        if (SUCCEEDED(hr))
-        {
-            // WIC2 is available on Windows 10, Windows 8.x, and Windows 7 SP1 with KB 2670838 installed
-            g_WIC2 = true;
-            return TRUE;
-        }
-        else
-        {
-            g_WIC2 = false;
-
-            hr = CoCreateInstance(
-                CLSID_WICImagingFactory1,
-                nullptr,
-                CLSCTX_INPROC_SERVER,
-                __uuidof(IWICImagingFactory),
-                factory
-            );
-            return SUCCEEDED(hr) ? TRUE : FALSE;
-        }
-#else
-        g_WIC2 = false;
-
-        return SUCCEEDED(CoCreateInstance(
-            CLSID_WICImagingFactory,
-            nullptr,
-            CLSCTX_INPROC_SERVER,
-            __uuidof(IWICImagingFactory),
-            factory)) ? TRUE : FALSE;
-#endif
-    }, nullptr, reinterpret_cast<LPVOID*>(&g_Factory));
-
-    iswic2 = g_WIC2;
-    return g_Factory;
+	return nullptr;
 }
 
 
@@ -292,27 +223,7 @@ IWICImagingFactory* DirectX::GetWICFactory(bool& iswic2)
 //-------------------------------------------------------------------------------------
 void DirectX::SetWICFactory(_In_opt_ IWICImagingFactory* pWIC)
 {
-    if (pWIC == g_Factory)
-        return;
-
-    bool iswic2 = false;
-    if (pWIC)
-    {
-#if(_WIN32_WINNT >= _WIN32_WINNT_WIN8) || defined(_WIN7_PLATFORM_UPDATE)
-        ComPtr<IWICImagingFactory2> wic2;
-        HRESULT hr = pWIC->QueryInterface(IID_PPV_ARGS(wic2.GetAddressOf()));
-        if (SUCCEEDED(hr))
-        {
-            iswic2 = true;
-        }
-#endif
-        pWIC->AddRef();
-    }
-
-    g_WIC2 = iswic2;
-    std::swap(pWIC, g_Factory);
-    if (pWIC)
-        pWIC->Release();
+	assert(FALSE);
 }
 
 
