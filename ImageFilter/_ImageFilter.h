@@ -35,9 +35,9 @@ namespace DotEngine
 		_ImageFilter();
 		virtual ~_ImageFilter();
 
-		std::shared_ptr<IToken> filter_async(LPDIRECT3DTEXTURE9 pSrcTexture, LPDIRECT3DTEXTURE9 pDstTexture, int denoise_level, float scale, Callback_type) override final;
+		std::shared_ptr<IToken> filter_async(LPDIRECT3DTEXTURE9, int denoise_level, float scale, Callback_type) override final;
 
-		void update() override final;
+		void update(LPDIRECT3DDEVICE9) override final;
 
 		inline size_t task_size() const override final { return _tasks.size(); }
 

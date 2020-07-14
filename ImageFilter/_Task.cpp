@@ -9,16 +9,14 @@ namespace DotEngine
 	size_t _Task::_unique_index{};
 
 
-	_Task::_Task(LPDIRECT3DTEXTURE9 pSrcTexture, LPDIRECT3DTEXTURE9 pDstTexture, Function_type function, IImageFilter::Callback_type callback) : _pSrcTexture{ pSrcTexture }, _pDstTexture{ pDstTexture }, _function{ function }, _callback{ callback }, _index{ ++_unique_index }
+	_Task::_Task(LPDIRECT3DTEXTURE9 pTexture, Function_type function, IImageFilter::Callback_type callback) : _pTexture{ pTexture }, _function{ function }, _callback{ callback }, _index{ ++_unique_index }
 	{
-		_pSrcTexture->AddRef();
-		_pDstTexture->AddRef();
+		_pTexture->AddRef();
 	}
 
 	_Task::~_Task()
 	{
-		_pSrcTexture->Release();
-		_pDstTexture->Release();
+		_pTexture->Release();
 
 		if (_token_issued) {
 			if (auto token_ptr = _weak_token_ptr.lock()) {

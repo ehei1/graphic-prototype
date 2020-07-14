@@ -95,11 +95,11 @@ namespace DotEngine
 		_impl.reset();
 	}
 
-	std::shared_ptr<IToken> _ImageFilter::filter_async(LPDIRECT3DTEXTURE9 pSrcTexture, LPDIRECT3DTEXTURE9 pDstTexture, int denoise_level, float scale, Callback_type callback)
+	std::shared_ptr<IToken> _ImageFilter::filter_async(LPDIRECT3DTEXTURE9 pTexture, int denoise_level, float scale, Callback_type callback)
 	{
 		D3DSURFACE_DESC surface_desc{};
 		
-		if (FAILED(pSrcTexture->GetLevelDesc(0, &surface_desc))) {
+		if (FAILED(pTexture->GetLevelDesc(0, &surface_desc))) {
 			throw std::runtime_error("D3DSURFACE_DESC getting is failed");
 		}
 
@@ -111,7 +111,7 @@ namespace DotEngine
 		case D3DFMT_X4R4G4B4:
 		{
 			auto functor = std::bind(&_ImageFilter::__apply_waifu2x_async, this, surface_desc.Width, surface_desc.Height, has_alpha, denoise_level, scale, std::placeholders::_1);
-			auto task = std::make_shared<_Task>(pSrcTexture, pDstTexture, functor, callback);
+			auto task = std::make_shared<_Task>(pTexture, functor, callback);
 			_tasks[task->_index] = task;
 			_task_indices.push(task->_index);
 
@@ -125,7 +125,7 @@ namespace DotEngine
 		}
 	}
 
-	void _ImageFilter::update()
+	void _ImageFilter::update(LPDIRECT3DDEVICE9 pDevice)
 	{
 		if (_task_indices.empty()) {
 			return;
@@ -151,17 +151,23 @@ namespace DotEngine
 					if (auto token_ptr = task->_weak_token_ptr.lock()) {
 						token_ptr->invalidate();
 
-						D3DLOCKED_RECT locked_rect{};
+						D3DSURFACE_DESC surface_desc{};
 
-						if (SUCCEEDED(task->_pDstTexture->LockRect(0, &locked_rect, NULL, 0))) {
-							D3DSURFACE_DESC surface_desc{};
+						if (SUCCEEDED(task->_pTexture->GetLevelDesc(0, &surface_desc))) {
+							LPDIRECT3DTEXTURE9 pTrueColorTexture{};
 
-							// 전달받은 텍스처에 복사
-							if (SUCCEEDED(task->_pDstTexture->GetLevelDesc(0, &surface_desc))) {
-								auto trueColorImage = task->_future.get();
-								__copy_to_surface_memory(locked_rect.pBits, trueColorImage.GetPixels(), surface_desc.Width, surface_desc.Height, locked_rect.Pitch, 32);
+							auto format = (surface_desc.Format == D3DFMT_A4R4G4B4) ? D3DFMT_A8R8G8B8 : D3DFMT_X8R8G8B8;
 
-								task->_callback(task->_pDstTexture);
+							if (SUCCEEDED(pDevice->CreateTexture(surface_desc.Width, surface_desc.Height, task->_pTexture->GetLevelCount(), surface_desc.Usage, format, surface_desc.Pool, &pTrueColorTexture, NULL))) {
+								D3DLOCKED_RECT locked_rect{};
+
+								if (SUCCEEDED(pTrueColorTexture->LockRect(0, &locked_rect, NULL, 0))) {
+									auto trueColorImage = task->_future.get();
+									__copy_to_surface_memory(locked_rect.pBits, trueColorImage.GetPixels(), surface_desc.Width, surface_desc.Height, locked_rect.Pitch, 32);
+
+									pTrueColorTexture->UnlockRect(0);
+									task->_callback(pTrueColorTexture);
+								}
 							}
 						}
 					}
@@ -175,22 +181,22 @@ namespace DotEngine
 		else {
 			assert(false == task->_cancelled);
 
-			D3DLOCKED_RECT locked_rect{};
-			constexpr UINT mipmap_level{};
+			D3DSURFACE_DESC surface_desc{};
 
-			if (SUCCEEDED(task->_pSrcTexture->LockRect(mipmap_level, &locked_rect, NULL, 0))) {
-				D3DSURFACE_DESC surface_desc{};
+			if (SUCCEEDED(task->_pTexture->GetLevelDesc(0, &surface_desc))) {
+				D3DLOCKED_RECT locked_rect{};
 
-				if (SUCCEEDED(task->_pSrcTexture->GetLevelDesc(mipmap_level, &surface_desc))) {
+				if (SUCCEEDED(task->_pTexture->LockRect(0, &locked_rect, NULL, 0))) {
+
 					DirectX::ScratchImage highColorImage;
 					{
 						highColorImage.Initialize2D(DXGI_FORMAT_B4G4R4A4_UNORM, surface_desc.Width, surface_desc.Height, 1, 1);
 
 						__copy_from_surface_memory(highColorImage.GetPixels(), locked_rect.pBits, surface_desc.Width, surface_desc.Height, locked_rect.Pitch, 16);
-						task->_pSrcTexture->UnlockRect(mipmap_level);
 					}
 
 					task->start(std::move(highColorImage));
+					task->_pTexture->UnlockRect(0);
 				}
 			}
 		}

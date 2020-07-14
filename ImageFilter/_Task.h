@@ -18,8 +18,7 @@ namespace DotEngine
 		Function_type _function;
 		IImageFilter::Callback_type _callback;
 
-		LPDIRECT3DTEXTURE9 _pSrcTexture{};
-		LPDIRECT3DTEXTURE9 _pDstTexture{};
+		LPDIRECT3DTEXTURE9 _pTexture{};
 		size_t const _index;
 		static size_t _unique_index;
 
@@ -30,7 +29,7 @@ namespace DotEngine
 		bool _async_started{};
 
 	public:
-		_Task(LPDIRECT3DTEXTURE9 pSrcTexture, LPDIRECT3DTEXTURE9 pDstTexture, Function_type function, IImageFilter::Callback_type callback);
+		_Task(LPDIRECT3DTEXTURE9 pTexutre, Function_type function, IImageFilter::Callback_type callback);
 		~_Task();
 
 		std::shared_ptr<IToken> issue_token(_ImageFilter& imageFilter);
