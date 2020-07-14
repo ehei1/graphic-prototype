@@ -9,6 +9,9 @@
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
     </Filter>
+    <Filter Include="Interface">
+      <UniqueIdentifier>{c69bd0fa-d961-4f9f-956d-9f81a4be2c41}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <Text Include="ReadMe.txt" />
@@ -17,7 +20,16 @@
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ImageFilter.h">
+    <ClInclude Include="IImageFilter.h">
+      <Filter>Interface</Filter>
+    </ClInclude>
+    <ClInclude Include="_ImageFilter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="_Token.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="_Task.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -25,7 +37,13 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ImageFilter.cpp">
+    <ClCompile Include="_Token.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="_ImageFilter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="_Task.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

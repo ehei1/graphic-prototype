@@ -142,17 +142,22 @@ copy $(ProjectDir)waifu2x\lib\$(Platform)\$(Configuration)\*.pdb $(OutDir) /y</C
     <Text Include="ReadMe.txt" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ImageFilter.h" />
+    <ClInclude Include="IImageFilter.h" />
+    <ClInclude Include="_ImageFilter.h" />
     <ClInclude Include="stdafx.h" />
+    <ClInclude Include="_Task.h" />
+    <ClInclude Include="_Token.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="ImageFilter.cpp" />
+    <ClCompile Include="_ImageFilter.cpp" />
     <ClCompile Include="stdafx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
     </ClCompile>
+    <ClCompile Include="_Task.cpp" />
+    <ClCompile Include="_Token.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
