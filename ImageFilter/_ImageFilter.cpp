@@ -162,26 +162,27 @@ namespace DotEngine
 						if (SUCCEEDED(task->_pTexture->GetLevelDesc(0, &surface_desc))) {
 							LPDIRECT3DTEXTURE9 pTrueColorTexture{};
 
-							auto format = (surface_desc.Format == D3DFMT_A4R4G4B4) ? D3DFMT_A8R8G8B8 : D3DFMT_X8R8G8B8;
+							auto trueColorImage = task->_future.get();
+							DirectX::Blob blob;
 
-							if (SUCCEEDED(pDevice->CreateTexture(surface_desc.Width, surface_desc.Height, task->_pTexture->GetLevelCount(), surface_desc.Usage, format, surface_desc.Pool, &pTrueColorTexture, NULL))) {
-								D3DLOCKED_RECT locked_rect{};
 
-								if (SUCCEEDED(pTrueColorTexture->LockRect(0, &locked_rect, NULL, 0))) {
-									auto trueColorImage = task->_future.get();
-									__copy_to_surface_memory(locked_rect.pBits, trueColorImage.GetPixels(), surface_desc.Width, surface_desc.Height, locked_rect.Pitch, 32);
 
-									pTrueColorTexture->UnlockRect(0);
-									task->_callback(pTrueColorTexture);
+							if (SUCCEEDED(DirectX::SaveToDDSMemory(*trueColorImage.GetImages(), 0, blob))) {
+								LPDIRECT3DTEXTURE9 pOutTexture{};
+
+								if (FAILED(D3DXCreateTextureFromFileInMemoryEx(pDevice, blob.GetBufferPointer(), blob.GetBufferSize(), surface_desc.Width, surface_desc.Height, 0, surface_desc.Usage, D3DFMT_DXT5, surface_desc.Pool, D3DX_FILTER_NONE, D3DX_FILTER_NONE, 0, NULL, NULL, &pOutTexture))) {
+									throw std::runtime_error("DXT texture failed to create");
 								}
-							}
-
-							if(_log_callback) {
-								auto elasped_time = std::chrono::system_clock::now() - task->_reserved_time;
-								auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elasped_time);
-								std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x done (" + std::to_string(elapsed_ms.count()) + "ms)";
 								
-								_log_callback(log);
+								task->_callback(pOutTexture);
+
+								if (_log_callback) {
+									auto elasped_time = std::chrono::system_clock::now() - task->_reserved_time;
+									auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elasped_time);
+									std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x done (" + std::to_string(elapsed_ms.count()) + "ms)";
+
+									_log_callback(log);
+								}
 							}
 						}
 					}

@@ -7,6 +7,7 @@
 
 // TODO: reference additional headers your program requires here
 #include <d3d9.h>
+#include <d3dx9.h>
 #include <Shlwapi.h>
 #include <Windows.h>
 
