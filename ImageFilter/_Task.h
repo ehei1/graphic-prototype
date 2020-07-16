@@ -17,7 +17,7 @@ namespace DotEngine
 	{
 		using Function_type = std::function<DirectX::ScratchImage(DirectX::ScratchImage&&)>;
 		Function_type _function;
-		IImageFilter::Callback_type _callback;
+		IImageFilter::Filter_callback_type _callback;
 
 		LPDIRECT3DTEXTURE9 _pTexture{};
 		size_t const _index;
@@ -33,7 +33,7 @@ namespace DotEngine
 		std::chrono::system_clock::time_point _started_time;
 
 	public:
-		_Task(LPDIRECT3DTEXTURE9 pTexutre, Function_type function, IImageFilter::Callback_type callback);
+		_Task(LPDIRECT3DTEXTURE9 pTexutre, Function_type function, IImageFilter::Filter_callback_type callback);
 		~_Task();
 
 		std::shared_ptr<IToken> issue_token(_ImageFilter& imageFilter);

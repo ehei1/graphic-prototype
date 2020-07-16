@@ -30,7 +30,6 @@ namespace DotEngine
 		std::unique_ptr< _Waifu2xImpl > _impl;
 		std::queue<Token_index> _task_indices;
 		std::unordered_map<Token_index, std::shared_ptr<_Task>> _tasks;
-		ImageFilterLogs::Logs _logs;
 		Log_callback_type _log_callback{};
 
 	public:
@@ -42,10 +41,6 @@ namespace DotEngine
 		void update(LPDIRECT3DDEVICE9) override final;
 
 		inline size_t task_size() const override final { return _tasks.size(); }
-
-		inline void clear_logs() override final { _logs.clear(); }
-
-		ImageFilterLogs iterate_logs() const override final { return { _logs }; }
 
 		inline void bind_log_callback(Log_callback_type callback) override final { _log_callback = callback; }
 

@@ -110,9 +110,9 @@ namespace DotEngine
 			has_alpha = true;
 		case D3DFMT_X4R4G4B4:
 		{
-			{
+			if(_log_callback) {
 				std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x reserved";
-				_logs.push_back(std::move(log));
+				_log_callback(log);
 			}
 
 			auto functor = std::bind(&_ImageFilter::__apply_waifu2x_async, this, surface_desc.Width, surface_desc.Height, has_alpha, denoise_level, scale, std::placeholders::_1);
@@ -181,7 +181,7 @@ namespace DotEngine
 								auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elasped_time);
 								std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x done (" + std::to_string(elapsed_ms.count()) + "ms)";
 								
-								_log_callback(std::move(log));
+								_log_callback(log);
 							}
 						}
 					}
@@ -213,13 +213,12 @@ namespace DotEngine
 					task->_pTexture->UnlockRect(0);
 					task->_reserved_time = std::chrono::system_clock::now();
 					
-
-					{
+					if(_log_callback) {
 						auto elapsed_time = std::chrono::system_clock::now() - task->_reserved_time;
 						auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time);
 						
 						std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x started (" + std::to_string(elapsed_ms.count()) + "ms)";
-						_logs.push_back(std::move(log));
+						_log_callback(log);
 					}
 				}
 			}
