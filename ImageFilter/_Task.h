@@ -1,5 +1,6 @@
 #pragma once
 
+#include <chrono>
 #include <functional>
 #include <future>
 #include <memory>
@@ -27,6 +28,9 @@ namespace DotEngine
 		bool _cancelled{};
 		bool _token_issued{};
 		bool _async_started{};
+
+		std::chrono::system_clock::time_point _reserved_time;
+		std::chrono::system_clock::time_point _started_time;
 
 	public:
 		_Task(LPDIRECT3DTEXTURE9 pTexutre, Function_type function, IImageFilter::Callback_type callback);

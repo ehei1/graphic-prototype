@@ -95,7 +95,7 @@ namespace DotEngine
 		_impl.reset();
 	}
 
-	std::shared_ptr<IToken> _ImageFilter::filter_async(LPDIRECT3DTEXTURE9 pTexture, int denoise_level, float scale, Callback_type callback)
+	std::shared_ptr<IToken> _ImageFilter::filter_async(LPDIRECT3DTEXTURE9 pTexture, int denoise_level, float scale, Filter_callback_type callback)
 	{
 		D3DSURFACE_DESC surface_desc{};
 		
@@ -110,6 +110,11 @@ namespace DotEngine
 			has_alpha = true;
 		case D3DFMT_X4R4G4B4:
 		{
+			{
+				std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x reserved";
+				_logs.push_back(std::move(log));
+			}
+
 			auto functor = std::bind(&_ImageFilter::__apply_waifu2x_async, this, surface_desc.Width, surface_desc.Height, has_alpha, denoise_level, scale, std::placeholders::_1);
 			auto task = std::make_shared<_Task>(pTexture, functor, callback);
 			_tasks[task->_index] = task;
@@ -117,11 +122,12 @@ namespace DotEngine
 
 			return task->issue_token(*this);
 		}	
-		case D3DFMT_A8B8G8R8:
-		case D3DFMT_X8B8G8R8:
+		case D3DFMT_A8R8G8B8:
+		case D3DFMT_X8R8G8B8:
 			return nullptr;
 		default:
-			throw std::invalid_argument("some formats do not support");
+			assert(false);
+			return nullptr;
 		}
 	}
 
@@ -145,7 +151,7 @@ namespace DotEngine
 		// 시작된 작업
 		if (task->_async_started) {
 			// 작업 끝
-			if (std::future_status::ready == task->_future.wait_until(std::chrono::system_clock::now())) {
+			if (std::future_status::ready == task->_future.wait_until(std::chrono::steady_clock::now())) {
 				if (!task->_cancelled) {
 					// 토큰이 살아있으면 콜백을 수행한다
 					if (auto token_ptr = task->_weak_token_ptr.lock()) {
@@ -168,6 +174,14 @@ namespace DotEngine
 									pTrueColorTexture->UnlockRect(0);
 									task->_callback(pTrueColorTexture);
 								}
+							}
+
+							if(_log_callback) {
+								auto elasped_time = std::chrono::system_clock::now() - task->_reserved_time;
+								auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elasped_time);
+								std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x done (" + std::to_string(elapsed_ms.count()) + "ms)";
+								
+								_log_callback(std::move(log));
 							}
 						}
 					}
@@ -197,6 +211,16 @@ namespace DotEngine
 
 					task->start(std::move(highColorImage));
 					task->_pTexture->UnlockRect(0);
+					task->_reserved_time = std::chrono::system_clock::now();
+					
+
+					{
+						auto elapsed_time = std::chrono::system_clock::now() - task->_reserved_time;
+						auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed_time);
+						
+						std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x started (" + std::to_string(elapsed_ms.count()) + "ms)";
+						_logs.push_back(std::move(log));
+					}
 				}
 			}
 		}

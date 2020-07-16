@@ -30,16 +30,24 @@ namespace DotEngine
 		std::unique_ptr< _Waifu2xImpl > _impl;
 		std::queue<Token_index> _task_indices;
 		std::unordered_map<Token_index, std::shared_ptr<_Task>> _tasks;
+		ImageFilterLogs::Logs _logs;
+		Log_callback_type _log_callback{};
 
 	public:
 		_ImageFilter();
 		virtual ~_ImageFilter();
 
-		std::shared_ptr<IToken> filter_async(LPDIRECT3DTEXTURE9, int denoise_level, float scale, Callback_type) override final;
+		std::shared_ptr<IToken> filter_async(LPDIRECT3DTEXTURE9, int denoise_level, float scale, Filter_callback_type) override final;
 
 		void update(LPDIRECT3DDEVICE9) override final;
 
 		inline size_t task_size() const override final { return _tasks.size(); }
+
+		inline void clear_logs() override final { _logs.clear(); }
+
+		ImageFilterLogs iterate_logs() const override final { return { _logs }; }
+
+		inline void bind_log_callback(Log_callback_type callback) override final { _log_callback = callback; }
 
 	protected:
 		void _remove_task(Token_index index);

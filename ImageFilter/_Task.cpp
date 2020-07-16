@@ -9,7 +9,7 @@ namespace DotEngine
 	size_t _Task::_unique_index{};
 
 
-	_Task::_Task(LPDIRECT3DTEXTURE9 pTexture, Function_type function, IImageFilter::Callback_type callback) : _pTexture{ pTexture }, _function{ function }, _callback{ callback }, _index{ ++_unique_index }
+	_Task::_Task(LPDIRECT3DTEXTURE9 pTexture, Function_type function, IImageFilter::Callback_type callback) : _pTexture{ pTexture }, _function{ function }, _callback{ callback }, _index{ ++_unique_index }, _started_time{ std::chrono::system_clock::now() }
 	{
 		_pTexture->AddRef();
 	}
