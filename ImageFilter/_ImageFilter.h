@@ -34,7 +34,6 @@ namespace DotEngine
 
 	public:
 		_ImageFilter();
-		virtual ~_ImageFilter();
 
 		std::shared_ptr<IToken> filter_async(LPDIRECT3DTEXTURE9, int denoise_level, float scale, Filter_callback_type) override final;
 

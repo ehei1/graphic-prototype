@@ -15,7 +15,9 @@ namespace DotEngine
 
 	public:
 		_Token(_ImageFilter& imageFilter, size_t index);
-		virtual ~_Token();
+		~_Token();
+		_Token(const _Token&) = delete;
+		_Token& operator=(const _Token&) = delete;
 
 		// 허상 포인터에 접근하는 걸 막기 위해 쓰인다
 		inline void invalidate() { _valid = false; }

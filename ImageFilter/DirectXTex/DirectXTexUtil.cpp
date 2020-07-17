@@ -210,7 +210,7 @@ REFGUID DirectX::GetWICCodec(WICCodecs codec)
 //-------------------------------------------------------------------------------------
 // Singleton function for WIC factory
 //-------------------------------------------------------------------------------------
-IWICImagingFactory* DirectX::GetWICFactory(bool& iswic2)
+IWICImagingFactory* DirectX::GetWICFactory(bool&)
 {
 	assert(FALSE);
 
@@ -221,7 +221,7 @@ IWICImagingFactory* DirectX::GetWICFactory(bool& iswic2)
 //-------------------------------------------------------------------------------------
 // Optional initializer for WIC factory
 //-------------------------------------------------------------------------------------
-void DirectX::SetWICFactory(_In_opt_ IWICImagingFactory* pWIC)
+void DirectX::SetWICFactory(_In_opt_ IWICImagingFactory* )
 {
 	assert(FALSE);
 }

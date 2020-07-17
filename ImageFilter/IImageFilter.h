@@ -40,6 +40,6 @@ namespace DotEngine
 
 	struct ImageFilterFactory
 	{
-		static std::unique_ptr<IImageFilter> createInstance();
+		static std::shared_ptr<IImageFilter> createInstance();
 	};
 }

@@ -35,6 +35,10 @@ namespace DotEngine
 	public:
 		_Task(LPDIRECT3DTEXTURE9 pTexutre, Function_type function, IImageFilter::Filter_callback_type callback);
 		~_Task();
+		_Task(const _Task&) = delete;
+		_Task(_Task&&) = delete;
+		_Task& operator=(const _Task&) = delete;
+		_Task& operator=(_Task&&) = delete;
 
 		std::shared_ptr<IToken> issue_token(_ImageFilter& imageFilter);
 		void start(DirectX::ScratchImage&&);

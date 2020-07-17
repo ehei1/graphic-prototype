@@ -17,10 +17,10 @@ namespace DotEngine
 		std::vector<W2XConv*> _converters{ nullptr, nullptr, nullptr, nullptr };
 
 	public:
-		_Waifu2xImpl::_Waifu2xImpl() 
+		_Waifu2xImpl() 
 		{}
 
-		_Waifu2xImpl::~_Waifu2xImpl()
+		~_Waifu2xImpl()
 		{
 			auto destory_converter = [](W2XConv* converter) { 
 				if (converter) { 
@@ -29,6 +29,11 @@ namespace DotEngine
 			};
 			std::for_each(std::begin(_converters), std::end(_converters), destory_converter);
 		}
+
+		_Waifu2xImpl(_Waifu2xImpl const&) = delete;
+		_Waifu2xImpl(_Waifu2xImpl&&) = delete;
+		_Waifu2xImpl& operator=(_Waifu2xImpl&) = delete;
+		_Waifu2xImpl& operator=(_Waifu2xImpl&&) = delete;
 
 		HRESULT filter(LPVOID pBits, size_t width, size_t height, bool has_alpha, int denoise_level, float scale)
 		{
@@ -87,13 +92,8 @@ namespace DotEngine
 	};
 
 
-	_ImageFilter::_ImageFilter() : _impl{ new _Waifu2xImpl }
+	_ImageFilter::_ImageFilter() : _impl{ std::make_unique<_Waifu2xImpl>() }
 	{}
-
-	_ImageFilter::~_ImageFilter()
-	{
-		_impl.reset();
-	}
 
 	std::shared_ptr<IToken> _ImageFilter::filter_async(LPDIRECT3DTEXTURE9 pTexture, int denoise_level, float scale, Filter_callback_type callback)
 	{
@@ -160,17 +160,22 @@ namespace DotEngine
 						D3DSURFACE_DESC surface_desc{};
 
 						if (SUCCEEDED(task->_pTexture->GetLevelDesc(0, &surface_desc))) {
-							LPDIRECT3DTEXTURE9 pTrueColorTexture{};
-
 							auto trueColorImage = task->_future.get();
 							DirectX::Blob blob;
-
-
 
 							if (SUCCEEDED(DirectX::SaveToDDSMemory(*trueColorImage.GetImages(), 0, blob))) {
 								LPDIRECT3DTEXTURE9 pOutTexture{};
 
-								if (FAILED(D3DXCreateTextureFromFileInMemoryEx(pDevice, blob.GetBufferPointer(), blob.GetBufferSize(), surface_desc.Width, surface_desc.Height, 0, surface_desc.Usage, D3DFMT_DXT5, surface_desc.Pool, D3DX_FILTER_NONE, D3DX_FILTER_NONE, 0, NULL, NULL, &pOutTexture))) {
+								auto multiply_four = [](UINT value) {
+									constexpr UINT base{ 4 };
+									auto result = value / base * 4;
+
+									return result == value ? result : result + 4;
+								};
+								auto width = multiply_four(surface_desc.Width);
+								auto height = multiply_four(surface_desc.Height);
+
+								if (FAILED(D3DXCreateTextureFromFileInMemoryEx(pDevice, blob.GetBufferPointer(), blob.GetBufferSize(), width, height, 0, surface_desc.Usage, D3DFMT_DXT5, surface_desc.Pool, D3DX_FILTER_LINEAR, D3DX_FILTER_LINEAR, 0, NULL, NULL, &pOutTexture))) {
 									throw std::runtime_error("DXT texture failed to create");
 								}
 								
@@ -287,8 +292,8 @@ namespace DotEngine
 		}
 	}
 
-	std::unique_ptr<IImageFilter> ImageFilterFactory::createInstance()
+	std::shared_ptr<IImageFilter> ImageFilterFactory::createInstance()
 	{
-		return std::make_unique<_ImageFilter>();
+		return std::make_shared<_ImageFilter>();
 	}
 }
