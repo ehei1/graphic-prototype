@@ -22,9 +22,9 @@ build job:
         - git submodule init
         - git submodule update
         - chcp 850
-        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Debug
-        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Release
-        - msbuild "Freeform Light.sln" /property:platform=x64 /property:target=Profile
+        - msbuild "dot.sln" /property:platform=x86 /property:target=Debug
+        - msbuild "dot.sln" /property:platform=x86 /property:target=Release
+        - msbuild "dot.sln" /property:platform=x86 /property:target=Profile
 
 test job:
     script:
