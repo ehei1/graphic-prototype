@@ -1,30 +1,22 @@
+variables:
+  MSBUILD: ${Env:ProgramFiles(x86)} + '\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin'
+
 stages:
     - build
     - test
     - deploy
 
-build job:
-    stage: build
-    
+build_job:
+    stage: build    
     tags:
         - ehei
     script:
-        - $loc = ${Env:ProgramFiles(x86)} + '\Microsoft Visual Studio 14.0\Common7\Tools'
-        # https://gist.github.com/sqeezy/11863647662b42e3b66b70331156c490
-        - pushd $loc
-        - cmd /c "vsvars32.bat&set" |
-            foreach {
-              if ($_ -match "=") {
-                $v = $_.split("="); set-item -force -path "ENV:\$($v[0])"  -value "$($v[1])"
-              }
-            }
-        - popd
         - git submodule init
         - git submodule update
         - chcp 850
-        - msbuild "dot.sln" /property:platform=x86 /property:target=Debug
-        - msbuild "dot.sln" /property:platform=x86 /property:target=Release
-        - msbuild "dot.sln" /property:platform=x86 /property:target=Profile
+        - $MSBUILD "dot.sln" /property:platform=x86 /property:target=Debug
+        - $MSBUILD "dot.sln" /property:platform=x86 /property:target=Release
+        - $MSBUILD "dot.sln" /property:platform=x86 /property:target=Profile
 
 test job:
     script:
