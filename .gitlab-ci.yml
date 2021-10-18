@@ -1,5 +1,5 @@
 variables:
-  MSBUILD: ${Env:ProgramFiles(x86)} + '\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin'
+  MSBUILD: ${Env:ProgramFiles(x86)} + '\Microsoft Visual Studio\2019\BuildTools\MSBuild\Current\Bin\MSBuild.exe'
 
 stages:
     - build
