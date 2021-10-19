@@ -5,7 +5,7 @@ stages:
     - build
     - test
     - deploy
-    - Release
+    - release
 
 build_job:
     stage: build    
@@ -34,11 +34,14 @@ deploy_job:
         - ehei
 
 release_job:
-    stage: release
-    only: master
-    release: {
-        name: 'Release $CI_COMMIT_SHA',
-        description: 'Created using the release-cli about foo',
-        tag_name: 'release-$CI_COMMIT_SHA',
+    stage: 'release'
+    only:
+        - master
+        - 'publish'
+    script:
+        - echo "running release_job"
+    release: 
+        name: 'Release $CI_COMMIT_SHA'
+        description: 'Created using the release-cli about foo'
+        tag_name: 'release-$CI_COMMIT_SHA'
         ref: '$CI_COMMIT_SHA'
-    }
