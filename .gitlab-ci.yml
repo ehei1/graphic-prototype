@@ -39,6 +39,8 @@ release_job:
         - master
         - 'publish'
     script:
+        - chcp 850
+        - ${Env:Path} += "C:\GitLab\release-CLI\bin"        
         - echo "running release_job"
     release: 
         name: 'Release $CI_COMMIT_SHA'
