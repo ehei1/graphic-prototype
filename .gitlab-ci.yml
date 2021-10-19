@@ -5,6 +5,7 @@ stages:
     - build
     - test
     - deploy
+    - Release
 
 build_job:
     stage: build    
@@ -18,14 +19,26 @@ build_job:
         - $MSBUILD "dot.sln" /property:platform=x86 /property:target=Release
         - $MSBUILD "dot.sln" /property:platform=x86 /property:target=Profile
 
-test job:
+test_job:
+    stage: test
     script:
         - echo "test coming soon"
     tags:
         - ehei
         
-deploy job:
+deploy_job:
+    stage: deploy
     script:
         - echo "deploy coming soon"
     tags:
         - ehei
+
+release_job:
+    stage: release
+    only: master
+    release: {
+        name: 'Release $CI_COMMIT_SHA',
+        description: 'Created using the release-cli about foo',
+        tag_name: 'release-$CI_COMMIT_SHA',
+        ref: '$CI_COMMIT_SHA'
+    }
