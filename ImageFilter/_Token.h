@@ -3,7 +3,7 @@
 #include "IImageFilter.h"
 
 
-namespace DotEngine
+namespace Flat
 {
 	class _ImageFilter;
 

@@ -10,7 +10,7 @@ struct IDirect3DTexture9;
 struct IDirect3DDevice9;
 
 
-namespace DotEngine
+namespace Flat
 {
 	struct IToken
 	{};

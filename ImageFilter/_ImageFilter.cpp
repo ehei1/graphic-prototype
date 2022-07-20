@@ -10,7 +10,7 @@
 #include "_Token.h"
 
 
-namespace DotEngine
+namespace Flat
 {
 	class _Waifu2xImpl
 	{
@@ -107,24 +107,23 @@ namespace DotEngine
 
 		switch (surface_desc.Format) {
 		case D3DFMT_A4R4G4B4:
+		case D3DFMT_A8R8G8B8:
 			has_alpha = true;
 		case D3DFMT_X4R4G4B4:
+		case D3DFMT_X8R8G8B8:
 		{
 			if(_log_callback) {
 				std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x reserved";
 				_log_callback(log);
 			}
 
-			auto functor = std::bind(&_ImageFilter::__apply_waifu2x_async, this, surface_desc.Width, surface_desc.Height, has_alpha, denoise_level, scale, std::placeholders::_1);
+			auto functor = std::bind(&_ImageFilter::__apply_waifu2x_async, this, has_alpha, denoise_level, scale, std::placeholders::_1);
 			auto task = std::make_shared<_Task>(pTexture, functor, callback);
 			_tasks[task->_index] = task;
 			_task_indices.push(task->_index);
 
 			return task->issue_token(*this);
-		}	
-		case D3DFMT_A8R8G8B8:
-		case D3DFMT_X8R8G8B8:
-			return nullptr;
+		}
 		default:
 			assert(false);
 			return nullptr;
@@ -172,10 +171,11 @@ namespace DotEngine
 
 									return result == value ? result : result + 4;
 								};
-								auto width = multiply_four(surface_desc.Width);
-								auto height = multiply_four(surface_desc.Height);
+								auto& metaData = trueColorImage.GetMetadata();
+								auto width = multiply_four(metaData.width);
+								auto height = multiply_four(metaData.height);
 
-								if (FAILED(D3DXCreateTextureFromFileInMemoryEx(pDevice, blob.GetBufferPointer(), blob.GetBufferSize(), width, height, 0, surface_desc.Usage, D3DFMT_DXT5, surface_desc.Pool, D3DX_FILTER_LINEAR, D3DX_FILTER_LINEAR, 0, NULL, NULL, &pOutTexture))) {
+								if (FAILED(D3DXCreateTextureFromFileInMemoryEx(pDevice, blob.GetBufferPointer(), blob.GetBufferSize(), width, height, 0, surface_desc.Usage, D3DFMT_DXT5, surface_desc.Pool, D3DX_FILTER_NONE, D3DX_FILTER_NONE, 0, NULL, NULL, &pOutTexture))) {
 									throw std::runtime_error("DXT texture failed to create");
 								}
 								
@@ -184,7 +184,7 @@ namespace DotEngine
 								if (_log_callback) {
 									auto elasped_time = std::chrono::system_clock::now() - task->_reserved_time;
 									auto elapsed_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elasped_time);
-									std::string log = "[" + std::to_string(surface_desc.Width) + "x" + std::to_string(surface_desc.Height) + "]" + "waifu2x done (" + std::to_string(elapsed_ms.count()) + "ms)";
+									std::string log = "[" + std::to_string(width) + "x" + std::to_string(height) + "]" + "waifu2x done (" + std::to_string(elapsed_ms.count()) + "ms)";
 
 									_log_callback(log);
 								}
@@ -210,9 +210,31 @@ namespace DotEngine
 
 					DirectX::ScratchImage highColorImage;
 					{
-						highColorImage.Initialize2D(DXGI_FORMAT_B4G4R4A4_UNORM, surface_desc.Width, surface_desc.Height, 1, 1);
+						auto imageFormat = DXGI_FORMAT_UNKNOWN;
+						auto bitPerPixel = 0u;
+						switch (surface_desc.Format)
+						{
+						case D3DFMT_A4R4G4B4:
+						case D3DFMT_X4R4G4B4:
+							imageFormat = DXGI_FORMAT_B4G4R4A4_UNORM;
+							bitPerPixel = 16;
+							break;
+						case D3DFMT_A8B8G8R8:
+						case D3DFMT_A8R8G8B8:
+						case D3DFMT_X8B8G8R8:
+						case D3DFMT_X8R8G8B8:
+							imageFormat = DXGI_FORMAT_B8G8R8A8_UNORM;
+							bitPerPixel = 32;
+							break;
+						default:
+							throw std::exception();
+							break;
+						}
 
-						__copy_from_surface_memory(highColorImage.GetPixels(), locked_rect.pBits, surface_desc.Width, surface_desc.Height, locked_rect.Pitch, 16);
+						highColorImage.Initialize2D(imageFormat, surface_desc.Width, surface_desc.Height, 1, 1);
+						__copy_from_surface_memory(highColorImage.GetPixels(), locked_rect.pBits, surface_desc.Width, surface_desc.Height, locked_rect.Pitch, bitPerPixel);
+
+						DirectX::SaveToDDSFile(*highColorImage.GetImage(0, 0, 0), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"C:\\Users\\ehei2\\temp0.dds");
 					}
 
 					task->start(std::move(highColorImage));
@@ -248,20 +270,42 @@ namespace DotEngine
 		}
 	}
 
-	DirectX::ScratchImage _ImageFilter::__apply_waifu2x_async(size_t width, size_t height, bool has_alpha, int denoise_level, float scale, DirectX::ScratchImage&& highColorImage)
+	DirectX::ScratchImage _ImageFilter::__apply_waifu2x_async(bool has_alpha, int denoise_level, float scale, DirectX::ScratchImage&& highColorImage)
 	{
-		auto format = (has_alpha ? DXGI_FORMAT_B8G8R8A8_UNORM : DXGI_FORMAT_B8G8R8X8_UNORM);
-		DirectX::ScratchImage trueColorImage;
+		auto format = highColorImage.GetMetadata().format;
 
-		// 트루 컬러 그림으로 바꾼다
-		if (FAILED(DirectX::Convert(highColorImage.GetImages(), highColorImage.GetImageCount(), highColorImage.GetMetadata(), format, DirectX::TEX_FILTER_FLAGS::TEX_FILTER_DEFAULT, DirectX::TEX_THRESHOLD_DEFAULT, trueColorImage))) {
+		if (format != DXGI_FORMAT_B8G8R8A8_UNORM && format != DXGI_FORMAT_B8G8R8X8_UNORM)
+		{
+			auto changingFormat = (has_alpha ? DXGI_FORMAT_B8G8R8A8_UNORM : DXGI_FORMAT_B8G8R8X8_UNORM);
+			DirectX::ScratchImage trueColorImage;
+
+			// 트루 컬러 그림으로 바꾼다
+			if (FAILED(DirectX::Convert(highColorImage.GetImages(), highColorImage.GetImageCount(), highColorImage.GetMetadata(), changingFormat, DirectX::TEX_FILTER_FLAGS::TEX_FILTER_POINT, DirectX::TEX_THRESHOLD_DEFAULT, trueColorImage))) {
+				throw std::runtime_error("image conversion is failed");
+			}
+
+			highColorImage = std::move(trueColorImage);
+		}
+
+		if (scale != 1.f)
+		{
+			auto image = highColorImage.GetImage(0, 0, 0);
+			DirectX::ScratchImage resizedImage;
+			DirectX::Resize(*image, static_cast<size_t>(image->width * scale), static_cast<size_t>(image->height * scale), DirectX::TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC, resizedImage);
+
+			highColorImage = std::move(resizedImage);
+		}
+
+
+		DirectX::SaveToDDSFile(*highColorImage.GetImage(0, 0, 0), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"C:\\Users\\ehei2\\temp1.dds");
+
+		auto& metaData = highColorImage.GetMetadata();
+
+		if (FAILED(_impl->filter(highColorImage.GetPixels(), metaData.width, metaData.height, has_alpha, denoise_level, 1.f))) {
 			throw std::runtime_error("image conversion is failed");
 		}
-		else if (FAILED(_impl->filter(trueColorImage.GetPixels(), width, height, has_alpha, denoise_level, scale))) {
-			throw std::runtime_error("image conversion is failed");
-		}
 
-		return trueColorImage;
+		return std::move(highColorImage);
 	}
 
 	void _ImageFilter::__copy_from_surface_memory(LPVOID pDst, LPVOID pSrc, size_t width, size_t height, UINT pitch, UINT bitPerPixel) const

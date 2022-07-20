@@ -13,7 +13,7 @@ namespace DirectX {
 	class ScratchImage;
 }
 
-namespace DotEngine
+namespace Flat
 {
 	struct _Task;
 
@@ -50,6 +50,6 @@ namespace DotEngine
 		void __copy_from_surface_memory(LPVOID pDst, LPVOID pSrc, size_t width, size_t height, UINT pitch, UINT bitPerPixel) const;
 		void __copy_to_surface_memory(LPVOID pDst, LPVOID pSrc, size_t width, size_t height, UINT pitch, UINT bitPerPixel) const;
 
-		DirectX::ScratchImage __apply_waifu2x_async(size_t width, size_t height, bool has_alpha, int denoise_level, float scale, DirectX::ScratchImage&&);
+		DirectX::ScratchImage __apply_waifu2x_async(bool has_alpha, int denoise_level, float scale, DirectX::ScratchImage&&);
 	};
 }

@@ -3,7 +3,7 @@
 #include "_ImageFilter.h"
 
 
-namespace DotEngine
+namespace Flat
 {
 	_Token::_Token(_ImageFilter& imageFilter, size_t index) : _imageFilter{ imageFilter }, _index{ index }
 	{}
