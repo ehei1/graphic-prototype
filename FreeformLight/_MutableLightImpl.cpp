@@ -30,11 +30,11 @@ namespace FreeformLight
 			if ( updatingIndex == index ) {
 				m_lightVertices[index].position = position;
 
-				// 중점 수정이 아니면 자동으로 설정해준다
+				// set automatically if it's not change mid point
 				if ( updatingIndex )
 				{
 					Points points;
-					// 첫번째 값은 원점이어서 제외
+					// exclude first value which is origin
 					std::transform( std::next( std::cbegin( m_lightVertices ) ), std::cend( m_lightVertices ), std::back_inserter( points ), []( auto& v ) { return v.position; } );
 
 					m_lightVertices[0].position = GetCenterPoint( points.begin(), points.end() );
@@ -141,7 +141,7 @@ namespace FreeformLight
 
 	bool _MutableLightImpl::IsInsidePolygon( const Points& linePoints, const D3DXVECTOR3& point ) const
 	{
-		//crosses는 점q와 오른쪽 반직선과 다각형과의 교점의 개수
+		// crosses is quantity of between point q and half line on the right and polygon
 		auto crosses = 0;
 		auto y = point.y;
 
@@ -150,12 +150,12 @@ namespace FreeformLight
 			auto& p0 = linePoints[index];
 			auto& p1 = linePoints[nextIndex];
 
-			//점 B가 선분 (p[i], p[j])의 y좌표 사이에 있음
+			// point B is between y coord of p[i] and one of p[j]
 			if ( ( p0.y > y ) != ( p1.y > y ) ) {
-				//atX는 점 B를 지나는 수평선과 선분 (p[i], p[j])의 교점
+				// atX is crossed point between vertical line that is over point B and line (p[i], p[j])
 				auto at = ( p1.x - p0.x ) * ( y - p0.y ) / ( p1.y - p0.y ) + p0.x;
 
-				//atX가 오른쪽 반직선과의 교점이 맞으면 교점의 개수를 증가시킨다.
+				// if atX is crossed with half line on the right-side, increase counter of it
 				if ( point.x < at ) {
 					++crosses;
 				}
@@ -165,7 +165,7 @@ namespace FreeformLight
 		return crosses % 2 > 0;
 	}
 
-	// 주어진 두 선과의 y 축 간의 교점을 얻는다
+	// get cross point between inputed two lines and y axis
 	bool _MutableLightImpl::GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR3 p1, const D3DXVECTOR2& mousePosition, D3DDISPLAYMODE const& displayMode )
 	{
 		using _PointPair = std::pair<D3DXVECTOR2, D3DXVECTOR2>;
@@ -180,7 +180,7 @@ namespace FreeformLight
 		D3DXVECTOR2 verticalPoint0 = { {}, mousePosition.y };
 		D3DXVECTOR2 verticalPoint1 = { static_cast<float>( displayMode.Width ), mousePosition.y };
 
-		// 수직선, 수평선을 그어 교점을 알아낸다
+		// find cross point by vertical or horizontal line
 		for ( auto pair : _LinePoints{ { horizonPoint0, horizonPoint1 },{ verticalPoint0, verticalPoint1 } } ) {
 			auto& q0 = pair.first;
 			auto& q1 = pair.second;
@@ -222,7 +222,7 @@ namespace FreeformLight
 
 
 	/*
-	지렛대의 원리로 찾는 중점
+	reference from
 	https://blog.naver.com/dbtkdwh0/90085488219
 	*/
 	template<class _InIt>
@@ -305,14 +305,14 @@ namespace FreeformLight
 		_MutableLightImpl::Points projectedPoints;
 		std::transform( std::begin( m_lightVertices ), std::end( m_lightVertices ), std::back_inserter( projectedPoints ), projectToScreen );
 
-		// 이동 가능한 단추를 그린다. 사실은 부유 창
+		// draw movable buttons. they're floating windows originally
 		for ( size_t i = 0; i < projectedPoints.size(); ++i ) {
 			auto index = m_lightIndices[i];
 			auto& projectedPoint = projectedPoints[index];
 			auto name = std::to_string( i );
 
-			// 단추 그림
-			// 부유 가능한 창을 만들고 이동 불가능하게 한다. 창이 선택되면 이동 가능한 상태로 한다. 그렇지 않으면 실수 오차로 인해 조금씩 움직일 수 있다
+			// draw button
+			// create floating window then change it immovable. if it is selected, change it movable. if not it can move slightly with floating-error.
 			{
 				auto&& isEditing = m_vertexEditingStates[i];
 				ImGui::SetNextWindowPos( { projectedPoint.x, projectedPoint.y }, isEditing ? ImGuiCond_Once : ImGuiCond_Always );
@@ -320,7 +320,7 @@ namespace FreeformLight
 
 				auto pointClosed = true;
 				auto hasMoreVertexThanTriangle = ( m_lightVertices.size() - 1 ) > 3;
-				// 원점 삭제 불가능
+				// origin deletion is impossible
 				auto noPointDeleted = i && hasMoreVertexThanTriangle ? &pointClosed : nullptr;
 				constexpr auto pointButtonStyle = ImGuiWindowFlags_NoDecoration - ImGuiWindowFlags_NoTitleBar;
 
@@ -343,7 +343,7 @@ namespace FreeformLight
 									return E_FAIL;
 								}
 							}
-							// 정점 전체 이동
+							// move entire vertices
 							else {
 								auto dx = p1.first - p0.first;
 								auto dy = p1.second - p0.second;
@@ -367,7 +367,7 @@ namespace FreeformLight
 					ImGui::End();
 				}
 
-				// 정점 삭제
+				// remove the vertex
 				if ( noPointDeleted && !*noPointDeleted ) {
 					if ( FAILED( RemoveLightVertex( pDevice, i ) ) ) {
 						ASSERT( FALSE );
@@ -380,7 +380,7 @@ namespace FreeformLight
 			}
 		}
 
-		// 선을 그린다
+		// draw lines
 		{
 			auto drawList = ImGui::GetBackgroundDrawList();
 			auto hasNoCrossPoint = true;
@@ -397,7 +397,7 @@ namespace FreeformLight
 
 				drawList->AddLine( { from.x, from.y }, { to.x, to.y }, IM_COL32_WHITE, 2 );
 
-				// 선 주위에 직사각형을 그린다. 이것은 마우스 커서 위치 판정에 쓰인다
+				// draw rectangle over the line. it uses for detecting of mouse cursor position
 				if ( isNoEditing && hasNoCrossPoint && mouseHoveringNoWindow )
 				{
 					const PointCacheKey cacheKey{ i0, i1 };
@@ -482,7 +482,7 @@ namespace FreeformLight
 	{
 		bool blurMaskUpdating{};
 
-		// 텍스처 수정
+		// modify texture
 		if ( m_pLightTexture && ( m_setting.lightColor != setting.lightColor || m_setting.intensity != setting.intensity ) ) {
 			SAFE_RELEASE( m_pLightTexture );
 
@@ -491,7 +491,7 @@ namespace FreeformLight
 			blurMaskUpdating = true;
 		}
 
-		// uv 수정
+		// modify UV
 		if ( m_setting.falloff != setting.falloff ) {
 			auto falloff = setting.falloff;
 

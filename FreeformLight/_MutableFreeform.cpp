@@ -13,54 +13,54 @@ namespace FreeformLight
 			return S_OK;
 		}
 
-		constexpr auto windowTitleName = u8"조명";
+		constexpr auto windowTitleName = u8"Light";
 		ImGui::Begin( windowTitleName, pIsVisible );
 
 		auto& io = ImGui::GetIO();
 		io.WantCaptureMouse = true;
 
 		if ( isAmbientMode ) {
-			ImGui::ColorEdit3( u8"주변", m_setting.ambient );
+			ImGui::ColorEdit3( u8"Ambient", m_setting.ambient );
 		}
 		else {
-			ImGui::TextWrapped( u8"주변 색을 바꾸려면 Ambient 플래그를 켜세요" );
+			ImGui::TextWrapped( u8"Check the flag to change ambient" );
 		}
 
 		size_t selectedLightIndex{};
 
-		if ( ImGui::CollapsingHeader( u8"프리폼" ) ) {
+		if ( ImGui::CollapsingHeader( u8"Freeform" ) ) {
 			if ( ImGui::IsItemHovered() ) {
 				ImGui::BeginTooltip();
-				ImGui::TextUnformatted( u8"메시로 만들어진 조명 마스크를 동적으로 편집" );
+				ImGui::TextUnformatted( u8"Edit dynamically with mask which made of mesh" );
 				ImGui::EndTooltip();
 			}
 
-			ImGui::Checkbox( u8"도우미", &m_setting.helper );
-			ImGui::Checkbox( u8"마스크", &m_setting.maskVisible );
+			ImGui::Checkbox( u8"Helper", &m_setting.helper );
+			ImGui::Checkbox( u8"Mask", &m_setting.maskVisible );
 
-			if ( ImGui::Button( u8"조명 추가" ) ) {
+			if ( ImGui::Button( u8"Add" ) ) {
 				AddLight( pDevice, xCenter, yCenter );
 			}
 
-			if ( ImGui::BeginTabBar( "freeform lights" ) )
+			if ( ImGui::BeginTabBar( "Lights" ) )
 			{
 				for ( size_t i{}; i < m_tabs.size(); ++i ) {
 					auto& tab = m_tabs[i];
 
 					if ( ImGui::BeginTabItem( tab.m_name.c_str(), &tab.m_opened, ImGuiTabItemFlags_None ) ) {
-						// 초점을 받은 탭 아이템
+						// focused tab
 						if ( tab.m_opened ) {
 							auto light = m_lightImpls[i];
 							auto newLightSetting = light->GetSetting();
 
-							ImGui::ColorEdit3( u8"빛", reinterpret_cast<float*>( &newLightSetting.lightColor ) );
-							ImGui::SliderFloat( u8"강도", &newLightSetting.intensity, 0.f, 1.f );
-							ImGui::SliderFloat( u8"드리움", &newLightSetting.falloff, 0, 10 );
+							ImGui::ColorEdit3( u8"Color", reinterpret_cast<float*>( &newLightSetting.lightColor ) );
+							ImGui::SliderFloat( u8"Intensity", &newLightSetting.intensity, 0.f, 1.f );
+							ImGui::SliderFloat( u8"Falloff", &newLightSetting.falloff, 0, 10 );
 							light->SetSetting( pDevice, newLightSetting );
 
 							selectedLightIndex = i;
 						}
-						// 초점을 받지 못한 탭 아이템
+						// unfocused tab
 						else {
 							RemoveLight( i );
 						}
@@ -98,7 +98,7 @@ namespace FreeformLight
 
 		m_lightImpls.emplace_back( std::move( lightImpl ) );
 
-		// 새로 추가된 거 활성화
+		// activate new one
 		m_tabs.emplace_back( true, std::to_string( m_tabs.size() + 1 ) );
 
 		ASSERT( m_lightImpls.size() == m_tabs.size() );
@@ -134,13 +134,13 @@ namespace FreeformLight
 		auto scaledWidth = displayMode.Width / 4;
 		auto scaledHeight = displayMode.Height / 4;
 
-		// 정점
+		// vertex
 		auto leftTopPoints = { D3DXVECTOR3{ -0.5f, -0.5f, 0.f } };
 		auto rightTopPoints = { D3DXVECTOR3{ 0.5f, -0.5f, 0.f } };
 		auto rightBottomPoints = { D3DXVECTOR3{ 0.5f, 0.5f, 0.f } };
 		auto leftBottomPoints = { D3DXVECTOR3{ -0.5f, 0.5f, 0.f } };
 
-		// 시계 방향으로 면을 살피면서 점을 추가한다
+		// add point around face for clock wise
 		for ( auto vertices : { leftTopPoints, rightTopPoints, rightBottomPoints, leftBottomPoints } ) {
 			points.insert( points.end(), std::cbegin( vertices ), std::cend( vertices ) );
 		}

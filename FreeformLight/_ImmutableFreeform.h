@@ -4,7 +4,7 @@
 
 
 /*
-편집 불가능한 조명
+it's unchangable light
 */
 namespace FreeformLight
 {

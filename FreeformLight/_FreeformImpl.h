@@ -3,9 +3,9 @@
 
 
 /*
-조명 컨테이너의 공통 구현
-
-조명을 컨테이너 내에 생성하고 그린다
+ * common implementation for light container
+ * 
+ * make a light in the container and then draw it
 */
 namespace FreeformLight
 {
@@ -15,17 +15,16 @@ namespace FreeformLight
 	public:
 		_FreeformImpl( const _FreeformImpl& ) = delete;
 
-		// 컨테이너 내에 조명이 있는지 알려준다
 		inline bool HasLight() const { return !m_lightImpls.empty(); }
 
-		// 모든 조명을 그린다. 현재 설정된 LPDIRECT3DSURFACE9에 그린다
+		// draw all lights
 		HRESULT Draw( LPDIRECT3DDEVICE9 pDevice, float x, float y )
 		{
 			if ( m_lightImpls.size() ) {
 				D3DMATRIX curVm{};
 				pDevice->GetTransform( D3DTS_VIEW, &curVm );
 
-				// 뷰 행렬을 기본으로 바꾼다. 게임 화면은 확대를 하는 경우가 있기 때문
+				// change view matrix to default. because game screen is magnified by user
 				{
 					D3DXVECTOR3 eye{ x, y, 1 };
 					D3DXVECTOR3 at{ x, y, -1 };
@@ -70,14 +69,14 @@ namespace FreeformLight
 
 				pDevice->SetFVF( oldFVF );
 
-				// 뷰 행렬 복원
+				// restore view matrix
 				pDevice->SetTransform( D3DTS_VIEW, &curVm );
 			}
 
 			return S_OK;
 		}
 
-		// 장치가 복구될 때 호출된다
+		// it'll call when device is restored
 		virtual HRESULT RestoreDevice( LPDIRECT3DDEVICE9 pDevice, D3DDISPLAYMODE const& )
 		{
 			for ( auto&& lightImpl : m_lightImpls ) {
@@ -91,7 +90,7 @@ namespace FreeformLight
 			return S_OK;
 		}
 
-		// 장치가 무효화될 때 호출된다
+		// it'll call when device is invalidated
 		void Invalidate()
 		{
 			for ( auto&& lightImpl : m_lightImpls ) {

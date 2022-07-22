@@ -142,7 +142,7 @@ namespace Flat
 		auto task_index = _task_indices.front();
 		auto task_iter = _tasks.find(task_index);
 
-		// 이미 취소된 작업이다
+		// it already was cancelled
 		if (std::end(_tasks) == task_iter) {
 			_task_indices.pop();
 			return;
@@ -150,12 +150,12 @@ namespace Flat
 
 		auto task = task_iter->second;
 
-		// 시작된 작업
+		// started task
 		if (task->_async_started) {
-			// 작업 끝
+			// it finished
 			if (std::future_status::ready == task->_future.wait_until(std::chrono::steady_clock::now())) {
 				if (!task->_cancelled) {
-					// 토큰이 살아있으면 콜백을 수행한다
+					// if token is alive then invoke callback
 					if (auto token_ptr = task->_weak_token_ptr.lock()) {
 						token_ptr->invalidate();
 
@@ -200,7 +200,7 @@ namespace Flat
 				_tasks.erase(task_index);
 			}
 		}
-		// 작업 중이 없으면 하나 시작시킨다
+		// if there is no running task, start reserved task at once
 		else {
 			assert(false == task->_cancelled);
 
@@ -261,7 +261,7 @@ namespace Flat
 		if (std::end(_tasks) != task_iter) {
 			auto& task = task_iter->second;
 
-			// 비동기 작업이 시작된 상태에서 future를 소멸시키면 처리가 봉쇄된다. 결과 대기를 DirectX 장치가 생성된 스레드에서 해야한다. 따라서 이런 행위는 프레임 멈춤을 유발한다. 이를 우회하기 위해 한번 시작된 작업은 끝날 때까지 봐준다.
+			// during async working if you elimitate future then will be block process. moreover waiting result should be in the thread that created DirectX device. In conclusion such action will be called freezing. To avoid it started task don't touch until finish.
 			if (task->_async_started) {
 				task_iter->second->_cancelled = true;
 			}
@@ -280,7 +280,7 @@ namespace Flat
 			auto changingFormat = (has_alpha ? DXGI_FORMAT_B8G8R8A8_UNORM : DXGI_FORMAT_B8G8R8X8_UNORM);
 			DirectX::ScratchImage trueColorImage;
 
-			// 트루 컬러 그림으로 바꾼다
+			// change to true color image
 			if (FAILED(DirectX::Convert(highColorImage.GetImages(), highColorImage.GetImageCount(), highColorImage.GetMetadata(), changingFormat, DirectX::TEX_FILTER_FLAGS::TEX_FILTER_POINT, DirectX::TEX_THRESHOLD_DEFAULT, trueColorImage))) {
 				throw std::runtime_error("image conversion is failed");
 			}

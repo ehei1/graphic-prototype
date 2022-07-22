@@ -22,42 +22,31 @@ namespace FreeformLight
 		_MutableLightImpl( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DPIXELSHADER9 pBlurShader, Points const& );
 		virtual ~_MutableLightImpl() {}
 
-		// 조명 설정을 바꾼다
 		HRESULT SetSetting( LPDIRECT3DDEVICE9, const Setting& );
-		// 조명 설정을 얻는다
 		inline const Setting& GetSetting() const { return m_setting; }
 
-		// 모든 조명을 그린다
 		virtual HRESULT Draw( LPDIRECT3DDEVICE9 ) override final;
-		// 조명 설정에 필요한 도우미를 그린다
 		HRESULT DrawHelper( LPDIRECT3DDEVICE9, D3DDISPLAYMODE const&, char const* windowTitleName );
 
 	private:
 		HRESULT UpdateLight( LPDIRECT3DDEVICE9, const Setting& );
 
-		// 정점을 편집한다
 		HRESULT UpdateLightVertex( LPDIRECT3DDEVICE9, WORD index, const D3DXVECTOR3& position );
 		HRESULT UpdateLightVertex( LPDIRECT3DDEVICE9, const Points& );
 		HRESULT AddLightVertex( LPDIRECT3DDEVICE9, size_t index, const D3DXVECTOR3& position );
 		HRESULT RemoveLightVertex( LPDIRECT3DDEVICE9, size_t index );
 
-		// 중점을 얻는다
 		bool IsInsidePolygon( const Points&, const D3DXVECTOR3& point ) const;
 
-		// 주어진 두 선과의 y 축 간의 교점을 얻는다
 		static bool GetCrossPoint( D3DXVECTOR3& out, D3DXVECTOR3 p0, D3DXVECTOR3 p1, const D3DXVECTOR2& mousePosition, D3DDISPLAYMODE const& );
 
-		// 정점 정보로부터 위치 값을 얻어낸다
 		Points GetPointsFromVertices( const Vertices& ) const;
 
-		// 정점들의 중점을 얻는다
 		template<class _InIt>
 		D3DXVECTOR3 GetCenterPoint( _InIt _First, _InIt _Last ) const;
 
-		// 기본 설정을 얻는다
 		Setting GetDefaultSetting() const;
 
-		// 편집 상태를 해제한다
 		inline void ClearEditingStates( size_t vertexCount ) { m_vertexEditingStates.clear(); m_vertexEditingStates.resize( vertexCount ); }
 
 	private:

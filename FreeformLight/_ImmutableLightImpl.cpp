@@ -41,7 +41,7 @@ namespace FreeformLight
 		constexpr auto textureFVF = D3DFVF_XYZRHW | D3DFVF_DIFFUSE;
 		LPDIRECT3DVERTEXBUFFER9 pVertexBuffer = {};
 
-		// 버텍스 버퍼 채우기
+		// fill vertex buffer
 		{
 			if ( FAILED( pDevice->CreateVertexBuffer( sizeof( customVertices ), 0, textureFVF, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
 				ASSERT( FALSE );
@@ -61,7 +61,7 @@ namespace FreeformLight
 
 		LPDIRECT3DTEXTURE9 pTexture = {};
 
-		// 그리기
+		// draw
 		{
 			if ( FAILED( D3DXCreateTexture( pDevice, resolution, resolution, 0, D3DUSAGE_RENDERTARGET, D3DFMT_A8R8G8B8, D3DPOOL_DEFAULT, &pTexture ) ) ) {
 				ASSERT( FALSE );
@@ -85,7 +85,7 @@ namespace FreeformLight
 				pDevice->EndScene();
 			}
 
-			// 복구
+			// restore
 			pDevice->SetRenderTarget( 0, currentRenderTarget );
 
 			SAFE_RELEASE( pTextureSurface );
@@ -105,7 +105,8 @@ namespace FreeformLight
 		*pOutTexture = pTexture;
 		return S_OK;
 	}
-	// 매우 느리지만 위의 함수를 고칠 때까지 사용한다. 리소스를 가능한 소스 폴더에 넣지 않으려는 시도
+
+	// it's really slow. but it is using until function above. i made an effort no resource into source folder
 	HRESULT _ImmutableLightImpl::CreateLightTextureByLockRect( LPDIRECT3DDEVICE9 pDevice, LPDIRECT3DTEXTURE9* pOutTexture, const Setting& setting ) const
 	{
 		ASSERT( !*pOutTexture );
@@ -119,7 +120,7 @@ namespace FreeformLight
 			return E_FAIL;
 		}
 
-		// 그라데이션을 그린다
+		// draw gradation
 		{
 			D3DLOCKED_RECT lockedRect = {};
 			pTexture->LockRect( 0, &lockedRect, NULL, D3DLOCK_NO_DIRTY_UPDATE );
@@ -175,20 +176,20 @@ namespace FreeformLight
 
 	HRESULT _ImmutableLightImpl::UpdateLightIndexBuffer( LPDIRECT3DINDEXBUFFER9* pOut, Indices& indices, LPDIRECT3DDEVICE9 pDevice, size_t vertexSize ) const
 	{
-		// 인덱스를 만든다
+		// make index
 		// https://en.cppreference.com/w/cpp/algorithm/generate
 		auto increaseNumber = [n = 0]() mutable { return n++; };
 
 		indices.resize( vertexSize );
 		std::generate( indices.begin(), indices.end(), increaseNumber );
 
-		// 항상 LT 위치에서 끝나야 한다
+		// it always must be finish at LT
 		indices.push_back( 1 );
 		auto indicesSize = sizeof( Indices::value_type ) * indices.size();
 
 		LPDIRECT3DINDEXBUFFER9 pIndexBuffer{};
 
-		// 인덱스 버퍼 갱신
+		// change index buffer
 		{
 			if ( FAILED( pDevice->CreateIndexBuffer( static_cast<UINT>( indicesSize ), D3DUSAGE_WRITEONLY, D3DFMT_INDEX16, D3DPOOL_DEFAULT, &pIndexBuffer, NULL ) ) ) {
 				ASSERT( FALSE );
@@ -219,7 +220,7 @@ namespace FreeformLight
 
 		vertices.clear();
 
-		// 프리폼 조명의 위치를 화면 중앙에 놓는다
+		// locate at center of freeform light
 		auto updateVertex = [i = -1, falloff]( const D3DXVECTOR3& position ) mutable {
 			auto uv = ( ++i % 2 ? D3DXVECTOR2{ falloff, 0 } : D3DXVECTOR2{ 0, 0 } );
 
@@ -231,7 +232,7 @@ namespace FreeformLight
 		auto verticesSize = sizeof( Vertices::value_type ) * vertices.size();
 		LPDIRECT3DVERTEXBUFFER9 pVertexBuffer{};
 
-		// 버텍스 버퍼 갱신
+		// change vertex buffer
 		{
 			if ( FAILED( pDevice->CreateVertexBuffer( static_cast<UINT>( verticesSize ), 0, m_lightVertexFvf, D3DPOOL_DEFAULT, &pVertexBuffer, NULL ) ) ) {
 				ASSERT( FALSE );
@@ -261,17 +262,18 @@ namespace FreeformLight
 		float height{};
 		float cx{};
 		float cy{};
-		// 외곽에 블러 처리를 먹이기 위해 크기를 키운다
+
+		// upscale to apply blur to border
 		constexpr auto meshScaling = 1.5f;
 
-		// 마스크 메시의 위치 설정
+		// setting position of mash mesh
 		{
 			float left{ FLT_MAX };
 			float right{ FLT_MIN };
 			float top{ FLT_MAX };
 			float bottom{ FLT_MIN };
 
-			// 정점의 LT, RT, LB, RB를 알아낸다
+			// get LT, RT, LB, RB of vertexes
 			for ( auto& vertice : vertices ) {
 				auto& p = vertice.position;
 				left = min( left, p.x );
@@ -280,32 +282,32 @@ namespace FreeformLight
 				bottom = max( bottom, p.y );
 			}
 
-			// w, h를 구한다
+			// get w, h
 			width = right - left;
 			height = bottom - top;
 			cx = left + width / 2;
 			cy = top + height / 2;
 
-			// 크기 행렬
+			// size matrix
 			D3DXMATRIX sm{};
 			D3DXMatrixScaling( &sm, width * meshScaling, height * meshScaling, 1 );
-			// 이동 행렬
+			// translation matrix
 			D3DXMATRIX tm{};
 			D3DXMatrixTranslation( &tm, cx, cy, 0 );
 
 			m_blurMask.m_worldTransform = sm * tm;
 		}
 
-		// 블러를 강화시키도록 텍스처를 줄인다. 값이 너무 작으면 그림에 계단 현상이 생긴다
+		// to enhance blur it downscale texture. if the value is so small, you could find stair pattern on the picture
 		constexpr float textureScaling = 0.5f;
 
-		// 마스크 복사
+		// copy mask
 		{
 			auto& pTexture = m_blurMask.m_pTexture;
 			auto maskWidth = static_cast<UINT>( width * textureScaling );
 			auto maskHeight = static_cast<UINT>( height * textureScaling );
 
-			// 크기가 다르면 다시 만든다
+			// if size of textures are different, make it again
 			if ( pTexture ) {
 				LPDIRECT3DSURFACE9 pSurface{};
 				pTexture->GetSurfaceLevel( 0, &pSurface );
@@ -326,7 +328,7 @@ namespace FreeformLight
 				}
 			}
 
-			// 마스크를 중앙에 복사한다
+			// copy mask at center
 			if ( SUCCEEDED( pDevice->BeginScene() ) ) {
 				LPDIRECT3DSURFACE9 pCurrrentSurface{};
 				pDevice->GetRenderTarget( 0, &pCurrrentSurface );
@@ -344,8 +346,8 @@ namespace FreeformLight
 
 				D3DXMATRIX oldPm{};
 				pDevice->GetTransform( D3DTS_PROJECTION, &oldPm );
-
-				// 새 행렬 설정
+				
+				// setting matrix newly
 				{
 					D3DXMATRIX pm{};
 					D3DXMatrixOrthoLH( &pm, width, height, -1, 1 );
@@ -448,7 +450,7 @@ namespace FreeformLight
 			return E_FAIL;
 		}
 
-		// 버텍스 버퍼 채우기
+		// fill vertex buffer
 		{
 			auto w = width / 2.f;
 			auto h = height / 2.f;
@@ -467,7 +469,7 @@ namespace FreeformLight
 			pMesh->UnlockVertexBuffer();
 		}
 
-		// 인덱스 버퍼 채우기
+		// fill index buffer
 		{
 			const WORD indices[] = {
 				0, 1, 2,
@@ -488,7 +490,7 @@ namespace FreeformLight
 
 	HRESULT _ImmutableLightImpl::Draw( LPDIRECT3DDEVICE9 pDevice )
 	{
-		// 마스크 메시를 그린다
+		// draw mask mesh
 		if ( SUCCEEDED( pDevice->BeginScene() ) ) {
 			D3DMATRIX wm{};
 			pDevice->GetTransform( D3DTS_WORLD, &wm );
@@ -519,7 +521,7 @@ namespace FreeformLight
 
 	HRESULT _ImmutableLightImpl::ReadyToRender( LPDIRECT3DDEVICE9 pDevice )
 	{
-		// 초기화
+		// initialization
 		if ( FAILED( CreateLightTextureByLockRect( pDevice, &m_pLightTexture, m_setting ) ) ) {
 			ASSERT( FALSE );
 
