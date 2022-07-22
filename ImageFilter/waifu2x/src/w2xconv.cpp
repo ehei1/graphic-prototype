@@ -2741,24 +2741,30 @@ int w2xconv_convert_memory
 )
 {
 	cv::Mat src_mat( height, width, mat_type, pBits );
-	// only debugging
-	//cv::cvtColor( src_mat, src_mat, cv::COLOR_BGRA2RGBA );
-	// cv::imwrite("D:\\study\\source.png", src_mat);
-
 	cv::Mat dst_mat;
 
-	//cv::imshow( "texture", src_mat );
-	//cv::waitKey( 0 );
-	//cv::destroyAllWindows();
-
 	w2xconv_convert_mat( conv, &dst_mat, &src_mat, denoise_level, scale, block_size, { 1, 1, 1 }, has_alpha, has_alpha );
-
-	//cv::imshow( "texture", dst_mat );
-	//cv::waitKey( 0 );
-	//cv::destroyAllWindows();
-
 	memcpy( pBits, dst_mat.data, dst_mat.total() * dst_mat.elemSize());
 
 	return 0;
 }
+
+int w2xconv_convert_memory2
+(
+	struct W2XConv* conv,
+	size_t width, size_t height, void* pDstBits, void* pSrcBits,
+	int denoise_level, /* 0:none, 1:L1 denoise, other:L2 denoise  */
+	double scale,
+	int block_size,
+	bool has_alpha,
+	int mat_type
+)
+{
+	cv::Mat src_mat(height, width, mat_type, pSrcBits);
+	cv::Mat dst_mat;
+
+	w2xconv_convert_mat(conv, &dst_mat, &src_mat, denoise_level, scale, block_size, { 1, 1, 1 }, has_alpha, has_alpha);
+	memcpy(pDstBits, dst_mat.data, dst_mat.total() * dst_mat.elemSize());
+	
+	return 0;}
 #endif

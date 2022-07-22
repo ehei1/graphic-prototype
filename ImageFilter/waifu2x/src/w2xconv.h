@@ -306,6 +306,17 @@ W2XCONV_EXPORT int w2xconv_convert_memory
 	int mat_type
 );
 
+W2XCONV_EXPORT int w2xconv_convert_memory2
+(
+	struct W2XConv* conv,
+	size_t width, size_t height, void* pDstBits, void* pSrcBits,
+	int denoise_level, /* 0:none, 1:L1 denoise, other:L2 denoise  */
+	double scale,
+	int block_size,
+	bool has_alpha,
+	int mat_type
+);
+
 #ifdef __cplusplus
 }
 #endif

@@ -35,19 +35,22 @@ namespace Flat
 		_Waifu2xImpl& operator=(_Waifu2xImpl&) = delete;
 		_Waifu2xImpl& operator=(_Waifu2xImpl&&) = delete;
 
-		HRESULT filter(LPVOID pBits, size_t width, size_t height, bool has_alpha, int denoise_level, float scale)
+		DirectX::ScratchImage filter(DirectX::ScratchImage&& sourceImage, bool has_alpha, int denoise_level, float scale)
 		{
 			int block_size{};
 			auto converter{ _get_converter(denoise_level) };
+			auto& metaData = sourceImage.GetMetadata();
+			DirectX::ScratchImage destImage;
+			destImage.Initialize2D(metaData.format, metaData.width * 2, metaData.height * 2, 1, 1);
 
-			if (auto error = w2xconv_convert_memory(converter, width, height, pBits, denoise_level, scale, block_size, has_alpha, CV_8UC4)) {
+			if (auto error = w2xconv_convert_memory2(converter, metaData.width, metaData.height, destImage.GetPixels(), sourceImage.GetPixels(), denoise_level, scale, block_size, has_alpha, CV_8UC4)) {
 				assert(false);
 
 				_check_for_errors(converter, error);
-				return E_FAIL;
+				throw std::exception();
 			}
 
-			return S_OK;
+			return destImage;
 		}
 
 	private:
@@ -233,8 +236,6 @@ namespace Flat
 
 						highColorImage.Initialize2D(imageFormat, surface_desc.Width, surface_desc.Height, 1, 1);
 						__copy_from_surface_memory(highColorImage.GetPixels(), locked_rect.pBits, surface_desc.Width, surface_desc.Height, locked_rect.Pitch, bitPerPixel);
-
-						DirectX::SaveToDDSFile(*highColorImage.GetImage(0, 0, 0), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"C:\\Users\\ehei2\\temp0.dds");
 					}
 
 					task->start(std::move(highColorImage));
@@ -287,25 +288,7 @@ namespace Flat
 			highColorImage = std::move(trueColorImage);
 		}
 
-		if (scale != 1.f)
-		{
-			auto image = highColorImage.GetImage(0, 0, 0);
-			DirectX::ScratchImage resizedImage;
-			DirectX::Resize(*image, static_cast<size_t>(image->width * scale), static_cast<size_t>(image->height * scale), DirectX::TEX_FILTER_FLAGS::TEX_FILTER_FORCE_NON_WIC, resizedImage);
-
-			highColorImage = std::move(resizedImage);
-		}
-
-
-		DirectX::SaveToDDSFile(*highColorImage.GetImage(0, 0, 0), DirectX::DDS_FLAGS::DDS_FLAGS_NONE, L"C:\\Users\\ehei2\\temp1.dds");
-
-		auto& metaData = highColorImage.GetMetadata();
-
-		if (FAILED(_impl->filter(highColorImage.GetPixels(), metaData.width, metaData.height, has_alpha, denoise_level, 1.f))) {
-			throw std::runtime_error("image conversion is failed");
-		}
-
-		return std::move(highColorImage);
+		return _impl->filter(std::move(highColorImage), has_alpha, denoise_level, scale);
 	}
 
 	void _ImageFilter::__copy_from_surface_memory(LPVOID pDst, LPVOID pSrc, size_t width, size_t height, UINT pitch, UINT bitPerPixel) const
