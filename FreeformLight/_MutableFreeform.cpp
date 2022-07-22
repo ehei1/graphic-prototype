@@ -135,10 +135,10 @@ namespace FreeformLight
 		auto scaledHeight = displayMode.Height / 4;
 
 		// 정점
-		auto leftTopPoints = { D3DXVECTOR3{ -1.0f, -1.0f, 0.f } };
-		auto rightTopPoints = { D3DXVECTOR3{ 1.0f, -1.0f, 0.f } };
-		auto rightBottomPoints = { D3DXVECTOR3{ 1.0f, 1.0f, 0.f } };
-		auto leftBottomPoints = { D3DXVECTOR3{ -1.0f, 1.0f, 0.f } };
+		auto leftTopPoints = { D3DXVECTOR3{ -0.5f, -0.5f, 0.f } };
+		auto rightTopPoints = { D3DXVECTOR3{ 0.5f, -0.5f, 0.f } };
+		auto rightBottomPoints = { D3DXVECTOR3{ 0.5f, 0.5f, 0.f } };
+		auto leftBottomPoints = { D3DXVECTOR3{ -0.5f, 0.5f, 0.f } };
 
 		// 시계 방향으로 면을 살피면서 점을 추가한다
 		for ( auto vertices : { leftTopPoints, rightTopPoints, rightBottomPoints, leftBottomPoints } ) {

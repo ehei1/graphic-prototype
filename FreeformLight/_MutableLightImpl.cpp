@@ -335,12 +335,11 @@ namespace FreeformLight
 
 						if ( p0 != p1 ) {
 							if ( i ) {
-								D3DXVECTOR3 out{};
-								D3DXVECTOR3 in{ nextPos.x, nextPos.y, 0.f };
-								D3DXVec3Unproject( &out, &in, &viewport, &projection, &view, &world );
-								out.z = {};
+								D3DXVECTOR3 point{ nextPos.x, nextPos.y, 0.f };
+								D3DXVec3Unproject( &point, &point, &viewport, &projection, &view, &world );
+								point.z = {};
 
-								if ( FAILED( UpdateLightVertex( pDevice, index, out ) ) ) {
+								if ( FAILED( UpdateLightVertex( pDevice, index, point ) ) ) {
 									return E_FAIL;
 								}
 							}
@@ -349,13 +348,15 @@ namespace FreeformLight
 								auto dx = p1.first - p0.first;
 								auto dy = p1.second - p0.second;
 
-								auto movePoints = [&dx, &dy]( const CUSTOM_VERTEX& vertex ) {
-									return vertex.position + D3DXVECTOR3{ static_cast<float>( dx ), static_cast<float>( dy ),{} };
+								auto updatePoint = [dx, dy, &viewport, &projection, &view, &world](D3DXVECTOR3& p) {
+									p += D3DXVECTOR3{ static_cast<float>(dx), static_cast<float>(dy),{} };
+									D3DXVec3Unproject(&p, &p, &viewport, &projection, &view, &world);
+									p.z = {};
 								};
-								Points points;
-								std::transform( std::cbegin( m_lightVertices ), std::cend( m_lightVertices ), std::back_inserter( points ), movePoints );
+								auto points = projectedPoints;
+								std::for_each(std::begin(points), std::end(points), updatePoint);
 
-								if ( FAILED( UpdateLightVertex( pDevice, points ) ) ) {
+								if ( FAILED( UpdateLightVertex( pDevice, points) ) ) {
 									return E_FAIL;
 								}
 							}

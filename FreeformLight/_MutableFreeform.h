@@ -34,7 +34,7 @@ namespace FreeformLight
 		struct Setting
 		{
 			bool maskVisible{};
-			bool helper{};
+			bool helper = true;
 
 			D3DXCOLOR ambient{ D3DCOLOR_XRGB( 125, 125, 125 ) };
 		} m_setting;
