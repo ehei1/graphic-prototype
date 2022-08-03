@@ -537,7 +537,6 @@ namespace FreeformLight
 
 			return E_FAIL;
 		}
-		// 현재 메시를 마스크로 찍어낸다. 정점이 업데이트된 경우에도 그러함
 		else if ( FAILED( UpdateBlurMask( pDevice, m_lightVertices ) ) ) {
 			ASSERT( FALSE );
 

@@ -154,9 +154,6 @@
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="src\Buffer.hpp" />
     <ClInclude Include="src\CLlib.h" />
     <ClInclude Include="src\common.hpp" />

@@ -171,9 +171,6 @@ copy $(ProjectDir)waifu2x\lib\$(Platform)\$(Configuration)\*.pdb $(SolutionDir)$
     </Lib>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <Text Include="ReadMe.txt" />
-  </ItemGroup>
-  <ItemGroup>
     <ClInclude Include="IImageFilter.h" />
     <ClInclude Include="_ImageFilter.h" />
     <ClInclude Include="stdafx.h" />

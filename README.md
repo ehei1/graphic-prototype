@@ -1,15 +1,16 @@
-# Freeform Light
+# features
+## freeform mask
+* mask with free editing mesh
+* you can edit whether adding or removing vertices to mesh for mask
+* introducing from Unity: [video](https://youtu.be/0xnYbhqRDkM?t=1079)
+## waifu2x-async
+* waifu2x is image scaler that is driven by deep learning
+* app uses [waifu2x-converter-cpp](https://github.com/DeadSix27/waifu2x-converter-cpp)
+* app converts textures asynchronously without blocking
 
-소개
+# screenshot
+![image info](./resource/screenshot/0.png)
 
-* 정점 편집을 통해 자유 형태의 마스크를 생성
-* 유니티 https://youtu.be/0xnYbhqRDkM?t=1079
-
-의존성
-
-* DirectX 9 SDK
-https://www.microsoft.com/en-us/download/details.aspx?id=6812
-
-스크린샷
-
-![image info](./screenshot/01.png)
+# dependency
+* it needs [DirectX 9 SDK](https://www.microsoft.com/en-us/download/details.aspx?id=6812) installation
+* Visual Studio 2019 <=
