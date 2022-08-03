@@ -21,13 +21,16 @@
     <ClCompile Include="imgui\imgui_draw.cpp">
       <Filter>Freeform Light\imgui</Filter>
     </ClCompile>
-    <ClCompile Include="imgui\examples\imgui_impl_dx9.cpp">
-      <Filter>Freeform Light\imgui</Filter>
-    </ClCompile>
-    <ClCompile Include="imgui\examples\imgui_impl_win32.cpp">
-      <Filter>Freeform Light\imgui</Filter>
-    </ClCompile>
     <ClCompile Include="imgui\imgui_widgets.cpp">
+      <Filter>Freeform Light\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\backends\imgui_impl_dx9.cpp">
+      <Filter>Freeform Light\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\backends\imgui_impl_win32.cpp">
+      <Filter>Freeform Light\imgui</Filter>
+    </ClCompile>
+    <ClCompile Include="imgui\imgui_tables.cpp">
       <Filter>Freeform Light\imgui</Filter>
     </ClCompile>
   </ItemGroup>
@@ -55,12 +58,6 @@
     <ClInclude Include="imgui\imgui.h">
       <Filter>Freeform Light\imgui</Filter>
     </ClInclude>
-    <ClInclude Include="imgui\examples\imgui_impl_dx9.h">
-      <Filter>Freeform Light\imgui</Filter>
-    </ClInclude>
-    <ClInclude Include="imgui\examples\imgui_impl_win32.h">
-      <Filter>Freeform Light\imgui</Filter>
-    </ClInclude>
     <ClInclude Include="imgui\imgui_internal.h">
       <Filter>Freeform Light\imgui</Filter>
     </ClInclude>
@@ -75,6 +72,12 @@
     </ClInclude>
     <ClInclude Include="FreeformLight\light.h">
       <Filter>Freeform Light</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\backends\imgui_impl_dx9.h">
+      <Filter>Freeform Light\imgui</Filter>
+    </ClInclude>
+    <ClInclude Include="imgui\backends\imgui_impl_win32.h">
+      <Filter>Freeform Light\imgui</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

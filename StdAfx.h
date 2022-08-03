@@ -14,8 +14,8 @@
 
 #include "imgui\imgui.h"
 #include "imgui_internal.h"
-#include "imgui\examples\imgui_impl_dx9.h"
-#include "imgui\examples\imgui_impl_win32.h"
+#include "imgui\backends\imgui_impl_dx9.h"
+#include "imgui\backends\imgui_impl_win32.h"
 
 #define SAFE_RELEASE(p) if(p) { (p)->Release( ); (p)=NULL;}
 #define SAFE_DELETE(p)  if(p) { delete (p); (p)=NULL; }

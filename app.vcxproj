@@ -319,11 +319,12 @@
     <ClCompile Include="FreeformLight\_ImmutableLightImpl.cpp" />
     <ClCompile Include="FreeformLight\_MutableFreeform.cpp" />
     <ClCompile Include="FreeformLight\_MutableLightImpl.cpp" />
-    <ClCompile Include="imgui\examples\imgui_impl_dx9.cpp" />
-    <ClCompile Include="imgui\examples\imgui_impl_win32.cpp" />
+    <ClCompile Include="imgui\backends\imgui_impl_dx9.cpp" />
+    <ClCompile Include="imgui\backends\imgui_impl_win32.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
+    <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="StdAfx.cpp">
       <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
@@ -337,8 +338,8 @@
     <ClInclude Include="FreeformLight\_ImmutableLightImpl.h" />
     <ClInclude Include="FreeformLight\_MutableFreeform.h" />
     <ClInclude Include="FreeformLight\_MutableLightImpl.h" />
-    <ClInclude Include="imgui\examples\imgui_impl_dx9.h" />
-    <ClInclude Include="imgui\examples\imgui_impl_win32.h" />
+    <ClInclude Include="imgui\backends\imgui_impl_dx9.h" />
+    <ClInclude Include="imgui\backends\imgui_impl_win32.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_internal.h" />
